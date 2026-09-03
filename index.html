@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>家庭派工看板</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root{
+    --paper:#F5F2EA;
+    --surface:#FFFFFF;
+    --surface-2:#ECE6D8;
+    --ink:#1E1B16;
+    --ink-soft:#6B6255;
+    --line:#DDD4C2;
+    --accent:#0E6E64;
+    --accent-ink:#FFFFFF;
+    --flag:#B96A22;
+    --danger:#B23A2E;
+    --danger-bg:#F7E3DF;
+    --success:#3F7A34;
+    --success-bg:#E6EEDF;
+    --shadow: 0 1px 2px rgba(30,27,22,.06), 0 4px 14px rgba(30,27,22,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#15171A;
+      --surface:#1D2023;
+      --surface-2:#262A2E;
+      --ink:#F0EDE4;
+      --ink-soft:#A9A296;
+      --line:#34383C;
+      --accent:#3FADA0;
+      --accent-ink:#0B1210;
+      --flag:#E3A542;
+      --danger:#E2685A;
+      --danger-bg:#3A211D;
+      --success:#7CB56A;
+      --success-bg:#23301F;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#15171A;
+    --surface:#1D2023;
+    --surface-2:#262A2E;
+    --ink:#F0EDE4;
+    --ink-soft:#A9A296;
+    --line:#34383C;
+    --accent:#3FADA0;
+    --accent-ink:#0B1210;
+    --flag:#E3A542;
+    --danger:#E2685A;
+    --danger-bg:#3A211D;
+    --success:#7CB56A;
+    --success-bg:#23301F;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{ font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace; font-variant-numeric:tabular-nums; }
+  .display{ font-family:"Big Shoulders Display","Noto Sans TC",sans-serif; }
+
+  a{ color:var(--accent); }
+  button{ font:inherit; color:inherit; }
+  input,select{ font:inherit; color:inherit; background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
+  input:focus-visible, select:focus-visible, button:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; gap:16px;
+    padding:14px 18px;
+    border-bottom:1px solid var(--line);
+    background:var(--surface);
+    flex-wrap:wrap;
+  }
+  .brand{ display:flex; flex-direction:column; margin-right:auto; }
+  .brand-mark{ font-family:"Big Shoulders Display",sans-serif; font-weight:800; font-size:22px; letter-spacing:.02em; line-height:1; }
+  .brand-sub{ font-size:11px; color:var(--ink-soft); letter-spacing:.08em; text-transform:uppercase; margin-top:2px; }
+  .clock{ font-size:20px; font-weight:600; letter-spacing:.03em; color:var(--flag); }
+  .persona-switch{ display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .persona-btn{ border:0; background:var(--surface); padding:7px 16px; cursor:pointer; font-size:14px; }
+  .persona-btn[data-active="1"]{ background:var(--accent); color:var(--accent-ink); font-weight:600; }
+
+  /* ---------- nav tabs ---------- */
+  .tabs{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:10px 18px; background:var(--surface-2); border-bottom:1px solid var(--line);
+  }
+  .tab-btn{
+    border:1px solid var(--line); background:var(--surface); border-radius:999px;
+    padding:7px 15px; font-size:14px; cursor:pointer; white-space:nowrap;
+  }
+  .tab-btn[data-active="1"]{ background:var(--ink); color:var(--paper); border-color:var(--ink); font-weight:600; }
+  .tabs input[type="date"]{ margin-left:auto; }
+
+  main{ padding:18px; max-width:980px; margin:0 auto; }
+  main.kanban-active{ max-width:none; padding:0; }
+  .topbar[hidden], .tabs[hidden]{ display:none!important; }
+
+  .day-heading{ display:flex; align-items:baseline; gap:10px; margin:4px 2px 16px; flex-wrap:wrap; }
+  .day-heading h1{ font-family:"Big Shoulders Display",sans-serif; font-weight:800; font-size:30px; margin:0; }
+  .day-heading .wk{ color:var(--ink-soft); font-size:15px; }
+
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:700px){ .grid{ grid-template-columns:1fr; } }
+
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    box-shadow:var(--shadow); overflow:hidden;
+  }
+  .card-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px; border-bottom:1px solid var(--line);
+  }
+  .card-tag{
+    font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  .card-body{ padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+
+  .row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .row .who{ font-weight:700; min-width:44px; flex-shrink:0; }
+  .row input[type="time"]{ width:128px; }
+  .row input.note{ flex:1; min-width:100px; }
+  .row select{ min-width:76px; }
+  .sep{ color:var(--ink-soft); }
+
+  .iconbtn{
+    border:1px solid var(--line); background:var(--surface); border-radius:6px;
+    width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:14px; flex-shrink:0;
+  }
+  .iconbtn:hover{ background:var(--surface-2); }
+  .addbtn{
+    align-self:flex-start; border:1px dashed var(--line); background:transparent;
+    border-radius:8px; padding:7px 12px; cursor:pointer; font-size:13px; color:var(--accent); font-weight:600;
+  }
+  .addbtn:hover{ background:var(--surface-2); }
+
+  .vrow{ border:1px solid var(--line); border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:6px; }
+  .vrow.conflict{ border-color:var(--danger); background:var(--danger-bg); }
+  .conflict-badge{ font-size:12px; color:var(--danger); font-weight:700; }
+
+  .chore-row{ display:flex; align-items:center; gap:8px; }
+  .chore-row input[type="checkbox"]{ width:18px; height:18px; accent-color:var(--success); }
+  .chore-row input.cname{ flex:1; min-width:70px; }
+  .chore-row.done .cname{ text-decoration:line-through; color:var(--ink-soft); }
+
+  .empty-hint{ font-size:13px; color:var(--ink-soft); }
+
+  /* ---------- template editor ---------- */
+  .wd-tabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+  .wd-tab{ border:1px solid var(--line); background:var(--surface); border-radius:8px; padding:6px 12px; cursor:pointer; font-size:14px; }
+  .wd-tab[data-active="1"]{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:700; }
+
+  /* ---------- kanban / TV mode ---------- */
+  .kanban{ background:#101214; color:#F2EAD8; min-height:100vh; padding:22px; }
+  .kanban .k-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .kanban .k-title{ font-family:"Big Shoulders Display",sans-serif; font-weight:800; font-size:26px; letter-spacing:.03em; }
+  .kanban .k-clock{ font-family:"IBM Plex Mono",monospace; font-size:34px; color:#E3A542; font-variant-numeric:tabular-nums; }
+  .kanban .k-exit{ border:1px solid #3A3F44; background:#1A1D20; color:#F2EAD8; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:13px; }
+  .kanban .k-grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width:900px){ .kanban .k-grid{ grid-template-columns:1fr; } }
+  .kanban .k-col{ border:1px solid #2C3034; border-radius:12px; background:#17191C; padding:16px; }
+  .kanban .k-col h2{ font-family:"Big Shoulders Display",sans-serif; font-size:24px; margin:0 0 10px; border-bottom:2px solid #2C3034; padding-bottom:8px; letter-spacing:.02em; }
+  .kanban .k-sec{ margin-bottom:14px; }
+  .kanban .k-sec-label{ font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#8A8F94; margin-bottom:6px; }
+  .kanban .k-line{
+    display:flex; justify-content:space-between; gap:10px; font-family:"IBM Plex Mono",monospace;
+    font-size:18px; padding:6px 0; border-bottom:1px dashed #2A2E32; font-variant-numeric:tabular-nums;
+  }
+  .kanban .k-line:last-child{ border-bottom:0; }
+  .kanban .k-line.conflict{ color:#FF8A73; }
+  .kanban .k-line .k-val{ color:#F2EAD8; }
+  .kanban .k-line .k-lbl{ color:#9CA3A8; }
+  .kanban .k-chip{ font-size:12px; padding:2px 8px; border-radius:999px; background:#242830; color:#C9CFD4; }
+  .kanban .k-chip.done{ background:var(--success-bg); color:#7CB56A; }
+  @keyframes kflash{ 0%{ opacity:.4; } 100%{ opacity:1; } }
+  .kanban.refresh .k-grid{ animation:kflash .5s ease; }
+  @media (prefers-reduced-motion: reduce){ .kanban.refresh .k-grid{ animation:none; } }
+
+  .gate-overlay{
+    position:fixed; inset:0; background:rgba(20,18,14,.55); display:flex; align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .gate-card{ background:var(--surface); border-radius:14px; padding:26px; max-width:360px; text-align:center; box-shadow:var(--shadow); }
+  .gate-card h2{ font-family:"Big Shoulders Display",sans-serif; margin:0 0 6px; font-size:22px; }
+  .gate-card p{ color:var(--ink-soft); font-size:14px; margin:0 0 18px; }
+  .gate-btns{ display:flex; gap:10px; justify-content:center; }
+  .gate-btns button{ flex:1; padding:12px; border-radius:10px; border:1px solid var(--line); background:var(--surface-2); font-weight:700; cursor:pointer; font-size:15px; }
+  .gate-btns button:hover{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+
+  .footnote{ text-align:center; color:var(--ink-soft); font-size:12px; padding:20px 10px 30px; }
+  .conn-note{ text-align:center; font-size:12px; padding:6px 10px; }
+  .conn-note.offline{ color:var(--danger); background:var(--danger-bg); }
+  [hidden]{ display:none!important; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">家庭派工看板</span>
+    <span class="brand-sub">Household Dispatch Board</span>
+  </div>
+  <div class="clock mono" id="headerClock">--:--:--</div>
+  <div class="persona-switch" id="personaSwitch">
+    <button class="persona-btn" data-persona="husband">先生</button>
+    <button class="persona-btn" data-persona="wife">太太</button>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button class="tab-btn" data-view="day" data-offset="0">今天</button>
+  <button class="tab-btn" data-view="day" data-offset="1">明天</button>
+  <button class="tab-btn" data-view="template">預設班表</button>
+  <button class="tab-btn" data-view="kanban">看板模式</button>
+  <input type="date" id="datePick" class="mono">
+</nav>
+
+<p class="conn-note" id="connNote" hidden></p>
+
+<main id="app">
+  <p class="empty-hint" style="padding:20px;">載入中…</p>
+</main>
+
+<div class="gate-overlay" id="gate" hidden>
+  <div class="gate-card">
+    <h2>你是誰？</h2>
+    <p>選一下身份，之後在看板上輸入的東西會標記是誰填的，也可以隨時在右上角切換。</p>
+    <div class="gate-btns">
+      <button data-persona="husband">我是先生</button>
+      <button data-persona="wife">我是太太</button>
+    </div>
+  </div>
+</div>
+
+<p class="footnote" id="footnote">資料即時同步・沒有登入機制，連結請留意保存 · 家庭派工看板</p>
+
+<script type="module">
+  // ---------------- Firebase setup ----------------
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import {
+    getFirestore, doc, onSnapshot, setDoc
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+  var firebaseConfig = {
+    apiKey: "AIzaSyAlWhwi8ZB9AJJWdEuU4AdL2CrtXbmC7UU",
+    authDomain: "familydaily-922c1.firebaseapp.com",
+    projectId: "familydaily-922c1",
+    storageBucket: "familydaily-922c1.firebasestorage.app",
+    messagingSenderId: "130605921918",
+    appId: "1:130605921918:web:13883d120221d09b654a2f"
+  };
+
+  var fbApp = initializeApp(firebaseConfig);
+  var firestore = getFirestore(fbApp);
+
+  // Thin adapter so the rest of the app can talk to Firestore the same
+  // way regardless of backend: db.doc(path).onSnapshot(cb, errCb) / .set(data)
+  var dbAdapter = {
+    doc: function(path){
+      var ref = doc(firestore, path);
+      return {
+        onSnapshot: function(next, err){
+          return onSnapshot(ref, function(snap){
+            next({ exists: snap.exists(), data: function(){ return snap.data(); } });
+          }, err);
+        },
+        set: function(data){ return setDoc(ref, data); }
+      };
+    }
+  };
+
+  window.__familyBoardDb = dbAdapter;
+  window.dispatchEvent(new CustomEvent("familyboard-db-ready"));
+</script>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------- constants ----------------
+  var WEEKDAY_LABELS = ["日","一","二","三","四","五","六"]; // index = Date.getDay()
+  var WEEKDAY_ORDER = [1,2,3,4,5,6,0]; // display Mon..Sun
+  var PEOPLE_BASIC = [ {id:"husband",label:"先生"}, {id:"wife",label:"太太"} ];
+  var PEOPLE_VEHICLE = [ {id:"husband",label:"先生"}, {id:"wife",label:"太太"}, {id:"fatherInLaw",label:"岳父"}, {id:"other",label:"其他"} ];
+  var MODES = [ {id:"car",label:"🚗 汽車"}, {id:"moto1",label:"🛵 機車1"}, {id:"moto2",label:"🛵 機車2"}, {id:"hsr",label:"🚄 高鐵"}, {id:"other",label:"其他"} ];
+  var RESOURCES = [ {id:"car",label:"汽車"}, {id:"moto1",label:"機車1"}, {id:"moto2",label:"機車2"} ];
+  var DEFAULT_CHORES = [
+    {id:"laundry", name:"洗衣服", assignee:""},
+    {id:"fold", name:"折衣服", assignee:""},
+    {id:"trash", name:"倒垃圾", assignee:""},
+    {id:"vacuum", name:"吸地板", assignee:""}
+  ];
+
+  function labelOf(list, id){ for(var i=0;i<list.length;i++){ if(list[i].id===id) return list[i].label; } return id||""; }
+  function personLabel(who, customLabel){
+    if(who==="other") return customLabel || "其他";
+    return labelOf(PEOPLE_VEHICLE, who) || "未指定";
+  }
+  function genId(){ return "id_"+Math.random().toString(36).slice(2,9); }
+  function pad2(n){ return String(n).padStart(2,"0"); }
+  function toISODate(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+  function addDays(d,n){ var r=new Date(d); r.setDate(r.getDate()+n); return r; }
+  function parseISODate(s){ var p=s.split("-").map(Number); return new Date(p[0],p[1]-1,p[2]); }
+
+  function defaultTemplate(){
+    return {
+      commute: {
+        husband: {start:"05:00", end:"16:00", mode:"car", note:""},
+        wife: {start:"08:00", end:"18:00", mode:"moto1", note:""}
+      },
+      baby: {
+        dropoff: {time:"07:30", who:""},
+        pickup: {time:"17:30", who:""}
+      },
+      chores: DEFAULT_CHORES.map(function(c){ return {id:c.id, name:c.name, assignee:c.assignee}; })
+    };
+  }
+  function emptyDayShape(){
+    return {
+      commute: { husband:{start:"",end:"",mode:"car",note:""}, wife:{start:"",end:"",mode:"car",note:""} },
+      baby: { dropoff:{time:"",who:""}, pickup:{time:"",who:""} },
+      chores: [], vehicles: []
+    };
+  }
+  function normalizeDay(obj){
+    var base = emptyDayShape();
+    if(!obj) return base;
+    return {
+      commute: {
+        husband: Object.assign({}, base.commute.husband, (obj.commute && obj.commute.husband) || {}),
+        wife: Object.assign({}, base.commute.wife, (obj.commute && obj.commute.wife) || {})
+      },
+      baby: {
+        dropoff: Object.assign({}, base.baby.dropoff, (obj.baby && obj.baby.dropoff) || {}),
+        pickup: Object.assign({}, base.baby.pickup, (obj.baby && obj.baby.pickup) || {})
+      },
+      chores: Array.isArray(obj.chores) ? obj.chores.map(function(c){ return {id:c.id, name:c.name||"", assignee:c.assignee||"", done:!!c.done}; }) : [],
+      vehicles: Array.isArray(obj.vehicles) ? obj.vehicles.map(function(v){ return {id:v.id, resource:v.resource||"car", who:v.who||"husband", customLabel:v.customLabel||"", start:v.start||"", end:v.end||"", note:v.note||""}; }) : []
+    };
+  }
+  function normalizeTemplate(obj){
+    var base = defaultTemplate();
+    if(!obj) return base;
+    return {
+      commute: {
+        husband: Object.assign({}, base.commute.husband, (obj.commute && obj.commute.husband) || {}),
+        wife: Object.assign({}, base.commute.wife, (obj.commute && obj.commute.wife) || {})
+      },
+      baby: {
+        dropoff: Object.assign({}, base.baby.dropoff, (obj.baby && obj.baby.dropoff) || {}),
+        pickup: Object.assign({}, base.baby.pickup, (obj.baby && obj.baby.pickup) || {})
+      },
+      chores: Array.isArray(obj.chores) ? obj.chores.map(function(c){ return {id:c.id, name:c.name||"", assignee:c.assignee||""}; }) : []
+    };
+  }
+
+  function findConflicts(vehicles){
+    var conflictIds = {};
+    var byResource = {};
+    vehicles.forEach(function(v){ (byResource[v.resource] = byResource[v.resource]||[]).push(v); });
+    Object.keys(byResource).forEach(function(res){
+      var list = byResource[res];
+      for(var i=0;i<list.length;i++){
+        for(var j=i+1;j<list.length;j++){
+          var a=list[i], b=list[j];
+          if(!a.start||!a.end||!b.start||!b.end) continue;
+          var overlap = a.start < b.end && b.start < a.end;
+          var keyA = a.who + (a.who==="other" ? ":"+a.customLabel : "");
+          var keyB = b.who + (b.who==="other" ? ":"+b.customLabel : "");
+          if(overlap && keyA !== keyB){ conflictIds[a.id]=true; conflictIds[b.id]=true; }
+        }
+      }
+    });
+    return conflictIds;
+  }
+
+  // ---------------- state ----------------
+  var state = {
+    db: null,
+    persona: localStorage.getItem("fb_persona") || "",
+    view: "day",
+    dayOffset: 0,
+    customDate: null, // ISO string or null
+    templates: {}, // weekday(0-6) -> normalized template
+    templatesLoaded: {}, // weekday -> bool
+    dayCache: {}, // dateStr -> raw doc data or null
+    daySubs: {}, // dateStr -> unsubscribe
+    tplWdView: (new Date()).getDay(), // which weekday tab open in template editor
+    ready: false
+  };
+
+  function currentDateStr(){
+    if(state.view==="day" && state.customDate) return state.customDate;
+    var base = new Date();
+    if(state.view==="day") base = addDays(base, state.dayOffset);
+    return toISODate(base);
+  }
+
+  function getEffectiveDay(dateStr){
+    var raw = state.dayCache[dateStr];
+    if(raw) return normalizeDay(raw);
+    var wd = parseISODate(dateStr).getDay();
+    var tpl = state.templates[wd];
+    if(!tpl) return emptyDayShape();
+    return normalizeDay({
+      commute: tpl.commute,
+      baby: tpl.baby,
+      chores: (tpl.chores||[]).map(function(c){ return Object.assign({done:false}, c); }),
+      vehicles: []
+    });
+  }
+
+  function writeDay(dateStr, dayObj){
+    dayObj.updatedBy = state.persona;
+    dayObj.updatedAt = Date.now();
+    state.dayCache[dateStr] = dayObj;
+    render();
+    if(state.db){
+      state.db.doc("days/"+dateStr).set(dayObj).catch(function(e){ console.error("write day failed", e); showConnNote(true); });
+    }
+  }
+
+  function ensureDaySub(dateStr){
+    if(state.daySubs[dateStr] || !state.db) return;
+    state.daySubs[dateStr] = state.db.doc("days/"+dateStr).onSnapshot(function(snap){
+      state.dayCache[dateStr] = snap.exists ? snap.data() : null;
+      render();
+    }, function(err){ console.error("day sub error", err); showConnNote(true); });
+  }
+
+  function writeTemplate(wd, tplObj){
+    state.templates[wd] = tplObj;
+    render();
+    if(state.db){
+      state.db.doc("template/"+wd).set(tplObj).catch(function(e){ console.error("write template failed", e); showConnNote(true); });
+    }
+  }
+
+  function showConnNote(offline){
+    var el = document.getElementById("connNote");
+    if(!el) return;
+    if(offline){
+      el.hidden = false;
+      el.classList.add("offline");
+      el.textContent = "⚠ 目前無法連上共用資料庫，剛剛的修改可能沒有存到，請檢查網路連線";
+    } else {
+      el.hidden = true;
+    }
+  }
+
+  // ---------------- init data backend ----------------
+  function startWithDb(db){
+    if(state.db) return; // already started
+    state.db = db;
+    for(var wd=0; wd<7; wd++){
+      (function(wd){
+        db.doc("template/"+wd).onSnapshot(function(snap){
+          showConnNote(false);
+          if(snap.exists){
+            state.templates[wd] = normalizeTemplate(snap.data());
+          } else if(!state.templatesLoaded[wd]) {
+            db.doc("template/"+wd).set(defaultTemplate()).catch(function(){});
+          }
+          state.templatesLoaded[wd] = true;
+          state.ready = Object.keys(state.templatesLoaded).length >= 7;
+          render();
+        }, function(err){ console.error("template sub error", err); showConnNote(true); });
+      })(wd);
+    }
+    ensureDaySub(toISODate(new Date()));
+    ensureDaySub(toISODate(addDays(new Date(),1)));
+  }
+  (function initDb(){
+    if(window.__familyBoardDb){ startWithDb(window.__familyBoardDb); return; }
+    window.addEventListener("familyboard-db-ready", function(){ startWithDb(window.__familyBoardDb); }, {once:true});
+    // safety net: if Firebase never loads (blocked network, typo in config...), don't leave the page stuck loading forever
+    setTimeout(function(){ if(!state.db){ showConnNote(true); state.ready = true; render(); } }, 6000);
+  })();
+
+  // ---------------- clock ----------------
+  function pumpClock(){
+    var now = new Date();
+    var s = pad2(now.getHours())+":"+pad2(now.getMinutes())+":"+pad2(now.getSeconds());
+    var el = document.getElementById("headerClock");
+    if(el) el.textContent = s;
+    var kel = document.getElementById("kanbanClock");
+    if(kel) kel.textContent = s;
+  }
+  setInterval(pumpClock, 1000);
+  pumpClock();
+
+  // ---------------- render: shell ----------------
+  function updatePersonaUI(){
+    document.querySelectorAll("#personaSwitch .persona-btn").forEach(function(b){
+      b.setAttribute("data-active", b.dataset.persona===state.persona ? "1":"0");
+    });
+    document.getElementById("gate").hidden = !!state.persona;
+  }
+  function updateTabsUI(){
+    document.querySelectorAll("#tabs .tab-btn").forEach(function(b){
+      var active = b.dataset.view===state.view && (b.dataset.view!=="day" || (!state.customDate && Number(b.dataset.offset)===state.dayOffset));
+      b.setAttribute("data-active", active ? "1":"0");
+    });
+  }
+
+  function render(){
+    updatePersonaUI();
+    updateTabsUI();
+    var isKanban = state.view==="kanban";
+    document.querySelector(".topbar").hidden = isKanban;
+    document.getElementById("tabs").hidden = isKanban;
+    document.getElementById("footnote").hidden = isKanban;
+    document.getElementById("app").classList.toggle("kanban-active", isKanban);
+    var app = document.getElementById("app");
+    if(!state.ready){ app.innerHTML = '<p class="empty-hint" style="padding:20px;">載入中…</p>'; return; }
+    if(state.view==="day") app.innerHTML = renderDayView();
+    else if(state.view==="template") app.innerHTML = renderTemplateView();
+    else if(state.view==="kanban") app.innerHTML = renderKanbanShell();
+    pumpClock();
+  }
+
+  // ---------------- render: day view ----------------
+  function sectionCard(tag, bodyHtml){
+    return '<div class="card"><div class="card-head"><span class="card-tag">'+tag+'</span></div><div class="card-body">'+bodyHtml+'</div></div>';
+  }
+
+  function commuteRowHtml(dateStr, person, label, data){
+    return '<div class="row">'
+      + '<span class="who">'+label+'</span>'
+      + '<input type="time" class="mono" value="'+data.start+'" data-action="commute-field" data-date="'+dateStr+'" data-person="'+person+'" data-field="start">'
+      + '<span class="sep">–</span>'
+      + '<input type="time" class="mono" value="'+data.end+'" data-action="commute-field" data-date="'+dateStr+'" data-person="'+person+'" data-field="end">'
+      + '<select data-action="commute-field" data-date="'+dateStr+'" data-person="'+person+'" data-field="mode">'
+        + MODES.map(function(m){ return '<option value="'+m.id+'"'+(m.id===data.mode?' selected':'')+'>'+m.label+'</option>'; }).join("")
+      + '</select>'
+      + '<input type="text" class="note" placeholder="備註" value="'+escapeAttr(data.note||"")+'" data-action="commute-field" data-date="'+dateStr+'" data-person="'+person+'" data-field="note">'
+      + '</div>';
+  }
+
+  function escapeAttr(s){ return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+
+  function vehicleRowHtml(dateStr, v, isConflict){
+    var opts = PEOPLE_VEHICLE.map(function(p){ return '<option value="'+p.id+'"'+(p.id===v.who?' selected':'')+'>'+p.label+'</option>'; }).join("");
+    var resOpts = RESOURCES.map(function(r){ return '<option value="'+r.id+'"'+(r.id===v.resource?' selected':'')+'>'+r.label+'</option>'; }).join("");
+    return '<div class="vrow'+(isConflict?' conflict':'')+'">'
+      + '<div class="row">'
+        + '<select data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="resource">'+resOpts+'</select>'
+        + '<select data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="who">'+opts+'</select>'
+        + (v.who==="other" ? '<input type="text" placeholder="是誰" class="note" style="max-width:90px" value="'+escapeAttr(v.customLabel)+'" data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="customLabel">' : '')
+        + '<input type="time" class="mono" value="'+v.start+'" data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="start">'
+        + '<span class="sep">–</span>'
+        + '<input type="time" class="mono" value="'+v.end+'" data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="end">'
+        + '<button class="iconbtn" title="刪除" data-action="vehicle-remove" data-date="'+dateStr+'" data-id="'+v.id+'">✕</button>'
+      + '</div>'
+      + '<input type="text" class="note" placeholder="備註（例如：去哪裡）" value="'+escapeAttr(v.note)+'" data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="note">'
+      + (isConflict ? '<span class="conflict-badge">⚠ 這台車此時段被重複登記</span>' : '')
+      + '</div>';
+  }
+
+  function choreRowHtml(dateStr, c){
+    var opts = '<option value="">未指定</option>' + PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===c.assignee?' selected':'')+'>'+p.label+'</option>'; }).join("");
+    return '<div class="chore-row'+(c.done?' done':'')+'">'
+      + '<input type="checkbox" '+(c.done?'checked':'')+' data-action="chore-toggle" data-date="'+dateStr+'" data-id="'+c.id+'">'
+      + '<input type="text" class="cname" value="'+escapeAttr(c.name)+'" data-action="chore-field" data-date="'+dateStr+'" data-id="'+c.id+'" data-field="name">'
+      + '<select data-action="chore-field" data-date="'+dateStr+'" data-id="'+c.id+'" data-field="assignee">'+opts+'</select>'
+      + '<button class="iconbtn" title="刪除" data-action="chore-remove" data-date="'+dateStr+'" data-id="'+c.id+'">✕</button>'
+      + '</div>';
+  }
+
+  function dayLabelParts(dateStr){
+    var d = parseISODate(dateStr);
+    var todayStr = toISODate(new Date());
+    var tomorrowStr = toISODate(addDays(new Date(),1));
+    var tag = dateStr===todayStr ? "今天" : (dateStr===tomorrowStr ? "明天" : "");
+    return { tag: tag, dateFmt: (d.getMonth()+1)+"/"+d.getDate(), wk: WEEKDAY_LABELS[d.getDay()] };
+  }
+
+  function renderDayView(){
+    var dateStr = currentDateStr();
+    ensureDaySub(dateStr);
+    var day = getEffectiveDay(dateStr);
+    var conflicts = findConflicts(day.vehicles);
+    var parts = dayLabelParts(dateStr);
+
+    var heading = '<div class="day-heading"><h1>'+(parts.tag?parts.tag+" ":"")+parts.dateFmt+'</h1><span class="wk">星期'+parts.wk+'</span></div>';
+
+    var commuteBody = commuteRowHtml(dateStr,"husband","先生",day.commute.husband) + commuteRowHtml(dateStr,"wife","太太",day.commute.wife);
+
+    var vehicleBody = day.vehicles.length
+      ? day.vehicles.map(function(v){ return vehicleRowHtml(dateStr, v, !!conflicts[v.id]); }).join("")
+      : '<p class="empty-hint">今天還沒有登記用車，點下面新增。</p>';
+    vehicleBody += '<button class="addbtn" data-action="vehicle-add" data-date="'+dateStr+'">＋ 新增用車登記</button>';
+
+    var babyBody = ''
+      + '<div class="row"><span class="who">送</span>'
+        + '<input type="time" class="mono" value="'+day.baby.dropoff.time+'" data-action="baby-field" data-date="'+dateStr+'" data-event="dropoff" data-field="time">'
+        + '<select data-action="baby-field" data-date="'+dateStr+'" data-event="dropoff" data-field="who">'
+          + '<option value="">未指定</option>' + PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===day.baby.dropoff.who?' selected':'')+'>'+p.label+'</option>'; }).join("")
+        + '</select></div>'
+      + '<div class="row"><span class="who">接</span>'
+        + '<input type="time" class="mono" value="'+day.baby.pickup.time+'" data-action="baby-field" data-date="'+dateStr+'" data-event="pickup" data-field="time">'
+        + '<select data-action="baby-field" data-date="'+dateStr+'" data-event="pickup" data-field="who">'
+          + '<option value="">未指定</option>' + PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===day.baby.pickup.who?' selected':'')+'>'+p.label+'</option>'; }).join("")
+        + '</select></div>';
+
+    var choreBody = (day.chores.length ? day.chores.map(function(c){ return choreRowHtml(dateStr, c); }).join("") : '<p class="empty-hint">目前沒有家務項目。</p>')
+      + '<button class="addbtn" data-action="chore-add" data-date="'+dateStr+'">＋ 新增家務</button>';
+
+    return heading
+      + '<div class="grid">'
+      + sectionCard("通勤", commuteBody)
+      + sectionCard("車輛使用登記", vehicleBody)
+      + sectionCard("寶寶接送", babyBody)
+      + sectionCard("家務", choreBody)
+      + '</div>';
+  }
+
+  // ---------------- render: template editor ----------------
+  function renderTemplateView(){
+    var wd = state.tplWdView;
+    var tpl = normalizeTemplate(state.templates[wd]);
+
+    var tabsHtml = '<div class="wd-tabs">' + WEEKDAY_ORDER.map(function(w){
+      return '<button class="wd-tab" data-active="'+(w===wd?1:0)+'" data-action="tpl-wd-select" data-weekday="'+w+'">星期'+WEEKDAY_LABELS[w]+'</button>';
+    }).join("") + '</div>';
+
+    var commuteBody = tplCommuteRow(wd,"husband","先生",tpl.commute.husband) + tplCommuteRow(wd,"wife","太太",tpl.commute.wife);
+
+    var babyBody = ''
+      + '<div class="row"><span class="who">送</span>'
+        + '<input type="time" class="mono" value="'+tpl.baby.dropoff.time+'" data-action="tpl-baby-field" data-weekday="'+wd+'" data-event="dropoff" data-field="time">'
+        + '<select data-action="tpl-baby-field" data-weekday="'+wd+'" data-event="dropoff" data-field="who">'
+          + '<option value="">未指定</option>' + PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===tpl.baby.dropoff.who?' selected':'')+'>'+p.label+'</option>'; }).join("")
+        + '</select></div>'
+      + '<div class="row"><span class="who">接</span>'
+        + '<input type="time" class="mono" value="'+tpl.baby.pickup.time+'" data-action="tpl-baby-field" data-weekday="'+wd+'" data-event="pickup" data-field="time">'
+        + '<select data-action="tpl-baby-field" data-weekday="'+wd+'" data-event="pickup" data-field="who">'
+          + '<option value="">未指定</option>' + PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===tpl.baby.pickup.who?' selected':'')+'>'+p.label+'</option>'; }).join("")
+        + '</select></div>';
+
+    var choreBody = (tpl.chores.length ? tpl.chores.map(function(c){ return tplChoreRow(wd,c); }).join("") : '<p class="empty-hint">目前沒有家務項目。</p>')
+      + '<button class="addbtn" data-action="tpl-chore-add" data-weekday="'+wd+'">＋ 新增家務</button>';
+
+    return '<div class="day-heading"><h1>預設班表</h1><span class="wk">套用到每週的星期'+WEEKDAY_LABELS[wd]+'，當天有異動再個別修改當天即可</span></div>'
+      + tabsHtml
+      + '<div class="grid">'
+      + sectionCard("通勤", commuteBody)
+      + sectionCard("寶寶接送", babyBody)
+      + sectionCard("家務", choreBody)
+      + '</div>';
+  }
+  function tplCommuteRow(wd, person, label, data){
+    return '<div class="row">'
+      + '<span class="who">'+label+'</span>'
+      + '<input type="time" class="mono" value="'+data.start+'" data-action="tpl-commute-field" data-weekday="'+wd+'" data-person="'+person+'" data-field="start">'
+      + '<span class="sep">–</span>'
+      + '<input type="time" class="mono" value="'+data.end+'" data-action="tpl-commute-field" data-weekday="'+wd+'" data-person="'+person+'" data-field="end">'
+      + '<select data-action="tpl-commute-field" data-weekday="'+wd+'" data-person="'+person+'" data-field="mode">'
+        + MODES.map(function(m){ return '<option value="'+m.id+'"'+(m.id===data.mode?' selected':'')+'>'+m.label+'</option>'; }).join("")
+      + '</select>'
+      + '<input type="text" class="note" placeholder="備註" value="'+escapeAttr(data.note||"")+'" data-action="tpl-commute-field" data-weekday="'+wd+'" data-person="'+person+'" data-field="note">'
+      + '</div>';
+  }
+  function tplChoreRow(wd, c){
+    var opts = '<option value="">未指定</option>' + PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===c.assignee?' selected':'')+'>'+p.label+'</option>'; }).join("");
+    return '<div class="chore-row">'
+      + '<input type="text" class="cname" value="'+escapeAttr(c.name)+'" data-action="tpl-chore-field" data-weekday="'+wd+'" data-id="'+c.id+'" data-field="name">'
+      + '<select data-action="tpl-chore-field" data-weekday="'+wd+'" data-id="'+c.id+'" data-field="assignee">'+opts+'</select>'
+      + '<button class="iconbtn" title="刪除" data-action="tpl-chore-remove" data-weekday="'+wd+'" data-id="'+c.id+'">✕</button>'
+      + '</div>';
+  }
+
+  // ---------------- render: kanban ----------------
+  function kanbanColumn(dateStr, title){
+    var day = getEffectiveDay(dateStr);
+    var conflicts = findConflicts(day.vehicles);
+    var commuteLines = [
+      kLine("先生", day.commute.husband.start && day.commute.husband.end ? (day.commute.husband.start+"–"+day.commute.husband.end+" "+labelOf(MODES,day.commute.husband.mode)) : "尚未設定"),
+      kLine("太太", day.commute.wife.start && day.commute.wife.end ? (day.commute.wife.start+"–"+day.commute.wife.end+" "+labelOf(MODES,day.commute.wife.mode)) : "尚未設定")
+    ].join("");
+
+    var vehicleLines = RESOURCES.map(function(r){
+      var uses = day.vehicles.filter(function(v){ return v.resource===r.id; });
+      if(!uses.length) return kLine(r.label, "未使用");
+      return uses.map(function(v){
+        var isC = conflicts[v.id];
+        return kLine(r.label, v.start+"–"+v.end+" "+personLabel(v.who,v.customLabel), isC);
+      }).join("");
+    }).join("");
+
+    var babyLines = kLine("送", day.baby.dropoff.time ? (day.baby.dropoff.time+" "+(personLabel(day.baby.dropoff.who)||"未指定")) : "尚未設定")
+      + kLine("接", day.baby.pickup.time ? (day.baby.pickup.time+" "+(personLabel(day.baby.pickup.who)||"未指定")) : "尚未設定");
+
+    var choreLines = day.chores.length ? day.chores.map(function(c){
+      return '<span class="k-chip'+(c.done?' done':'')+'">'+(c.done?"☑":"☐")+" "+escapeAttr(c.name)+(c.assignee?"・"+labelOf(PEOPLE_BASIC,c.assignee):"")+'</span>';
+    }).join(" ") : '<span class="k-chip">無項目</span>';
+
+    return '<div class="k-col"><h2>'+title+'</h2>'
+      + '<div class="k-sec"><div class="k-sec-label">通勤</div>'+commuteLines+'</div>'
+      + '<div class="k-sec"><div class="k-sec-label">車輛</div>'+vehicleLines+'</div>'
+      + '<div class="k-sec"><div class="k-sec-label">寶寶接送</div>'+babyLines+'</div>'
+      + '<div class="k-sec"><div class="k-sec-label">家務</div><div style="display:flex;gap:8px;flex-wrap:wrap;">'+choreLines+'</div></div>'
+      + '</div>';
+  }
+  function kLine(label, val, conflict){
+    return '<div class="k-line'+(conflict?' conflict':'')+'"><span class="k-lbl">'+label+'</span><span class="k-val">'+val+(conflict?' ⚠':'')+'</span></div>';
+  }
+  function renderKanbanShell(){
+    var todayStr = toISODate(new Date());
+    var tomorrowStr = toISODate(addDays(new Date(),1));
+    ensureDaySub(todayStr); ensureDaySub(tomorrowStr);
+    var d = new Date();
+    var dateFmt = (d.getMonth()+1)+"/"+d.getDate()+"（星期"+WEEKDAY_LABELS[d.getDay()]+"）";
+    return '<div class="kanban" id="kanbanRoot">'
+      + '<div class="k-top"><div><div class="k-title">家庭派工看板</div><div style="color:#8A8F94;font-size:13px;margin-top:2px;">'+dateFmt+'</div></div>'
+      + '<div class="k-clock mono" id="kanbanClock">--:--:--</div>'
+      + '<button class="k-exit" data-action="exit-kanban">離開看板模式</button></div>'
+      + '<div class="k-grid">' + kanbanColumn(todayStr,"今天") + kanbanColumn(tomorrowStr,"明天") + '</div>'
+      + '</div>';
+  }
+
+  // ---------------- event handling ----------------
+  document.getElementById("personaSwitch").addEventListener("click", function(e){
+    var btn = e.target.closest("[data-persona]");
+    if(!btn) return;
+    setPersona(btn.dataset.persona);
+  });
+  document.getElementById("gate").addEventListener("click", function(e){
+    var btn = e.target.closest("[data-persona]");
+    if(!btn) return;
+    setPersona(btn.dataset.persona);
+  });
+  function setPersona(p){
+    state.persona = p;
+    localStorage.setItem("fb_persona", p);
+    updatePersonaUI();
+  }
+
+  document.getElementById("tabs").addEventListener("click", function(e){
+    var btn = e.target.closest(".tab-btn");
+    if(!btn) return;
+    state.view = btn.dataset.view;
+    if(btn.dataset.view==="day"){ state.dayOffset = Number(btn.dataset.offset); state.customDate = null; document.getElementById("datePick").value=""; }
+    render();
+  });
+  document.getElementById("datePick").addEventListener("change", function(e){
+    if(!e.target.value) return;
+    state.view = "day"; state.customDate = e.target.value;
+    render();
+  });
+
+  document.getElementById("app").addEventListener("click", function(e){
+    var t = e.target.closest("[data-action]");
+    if(!t) return;
+    var action = t.dataset.action;
+
+    if(action==="vehicle-add"){
+      var dateStr = t.dataset.date;
+      var day = getEffectiveDay(dateStr);
+      day.vehicles.push({id:genId(), resource:"car", who: state.persona || "husband", customLabel:"", start:"", end:"", note:""});
+      writeDay(dateStr, day);
+    } else if(action==="vehicle-remove"){
+      var dateStr = t.dataset.date, id = t.dataset.id;
+      var day = getEffectiveDay(dateStr);
+      day.vehicles = day.vehicles.filter(function(v){ return v.id!==id; });
+      writeDay(dateStr, day);
+    } else if(action==="chore-add"){
+      var dateStr = t.dataset.date;
+      var day = getEffectiveDay(dateStr);
+      day.chores.push({id:genId(), name:"新家務", assignee:"", done:false});
+      writeDay(dateStr, day);
+    } else if(action==="chore-remove"){
+      var dateStr = t.dataset.date, id = t.dataset.id;
+      var day = getEffectiveDay(dateStr);
+      day.chores = day.chores.filter(function(c){ return c.id!==id; });
+      writeDay(dateStr, day);
+    } else if(action==="chore-toggle"){
+      var dateStr = t.dataset.date, id = t.dataset.id;
+      var day = getEffectiveDay(dateStr);
+      day.chores = day.chores.map(function(c){ return c.id===id ? Object.assign({}, c, {done:!c.done}) : c; });
+      writeDay(dateStr, day);
+    } else if(action==="tpl-wd-select"){
+      state.tplWdView = Number(t.dataset.weekday);
+      render();
+    } else if(action==="tpl-chore-add"){
+      var wd = Number(t.dataset.weekday);
+      var tpl = normalizeTemplate(state.templates[wd]);
+      tpl.chores.push({id:genId(), name:"新家務", assignee:""});
+      writeTemplate(wd, tpl);
+    } else if(action==="tpl-chore-remove"){
+      var wd = Number(t.dataset.weekday), id = t.dataset.id;
+      var tpl = normalizeTemplate(state.templates[wd]);
+      tpl.chores = tpl.chores.filter(function(c){ return c.id!==id; });
+      writeTemplate(wd, tpl);
+    } else if(action==="exit-kanban"){
+      state.view = "day"; render();
+    }
+  });
+
+  document.getElementById("app").addEventListener("input", function(e){
+    handleFieldChange(e.target);
+  });
+  document.getElementById("app").addEventListener("change", function(e){
+    if(e.target.tagName==="SELECT") handleFieldChange(e.target);
+  });
+
+  function handleFieldChange(el){
+    var action = el.dataset.action;
+    if(!action) return;
+
+    if(action==="commute-field"){
+      var dateStr = el.dataset.date, person = el.dataset.person, field = el.dataset.field;
+      var day = getEffectiveDay(dateStr);
+      day.commute[person][field] = el.value;
+      writeDay(dateStr, day);
+    } else if(action==="baby-field"){
+      var dateStr = el.dataset.date, ev = el.dataset.event, field = el.dataset.field;
+      var day = getEffectiveDay(dateStr);
+      day.baby[ev][field] = el.value;
+      writeDay(dateStr, day);
+    } else if(action==="vehicle-field"){
+      var dateStr = el.dataset.date, id = el.dataset.id, field = el.dataset.field;
+      var day = getEffectiveDay(dateStr);
+      day.vehicles = day.vehicles.map(function(v){
+        if(v.id!==id) return v;
+        var nv = Object.assign({}, v);
+        nv[field] = el.value;
+        return nv;
+      });
+      writeDay(dateStr, day);
+    } else if(action==="chore-field"){
+      var dateStr = el.dataset.date, id = el.dataset.id, field = el.dataset.field;
+      var day = getEffectiveDay(dateStr);
+      day.chores = day.chores.map(function(c){
+        if(c.id!==id) return c;
+        var nc = Object.assign({}, c);
+        nc[field] = el.value;
+        return nc;
+      });
+      writeDay(dateStr, day);
+    } else if(action==="tpl-commute-field"){
+      var wd = Number(el.dataset.weekday), person = el.dataset.person, field = el.dataset.field;
+      var tpl = normalizeTemplate(state.templates[wd]);
+      tpl.commute[person][field] = el.value;
+      writeTemplate(wd, tpl);
+    } else if(action==="tpl-baby-field"){
+      var wd = Number(el.dataset.weekday), ev = el.dataset.event, field = el.dataset.field;
+      var tpl = normalizeTemplate(state.templates[wd]);
+      tpl.baby[ev][field] = el.value;
+      writeTemplate(wd, tpl);
+    } else if(action==="tpl-chore-field"){
+      var wd = Number(el.dataset.weekday), id = el.dataset.id, field = el.dataset.field;
+      var tpl = normalizeTemplate(state.templates[wd]);
+      tpl.chores = tpl.chores.map(function(c){
+        if(c.id!==id) return c;
+        var nc = Object.assign({}, c);
+        nc[field] = el.value;
+        return nc;
+      });
+      writeTemplate(wd, tpl);
+    }
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
