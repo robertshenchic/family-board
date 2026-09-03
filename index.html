@@ -436,8 +436,15 @@
   function ensureDaySub(dateStr){
     if(state.daySubs[dateStr] || !state.db) return;
     state.daySubs[dateStr] = state.db.doc("days/"+dateStr).onSnapshot(function(snap){
-      state.dayCache[dateStr] = snap.exists ? snap.data() : null;
-      render();
+      var incoming = snap.exists ? snap.data() : null;
+      // Skip the re-render when this snapshot just echoes back data we already
+      // have locally (e.g. confirming our own write) — otherwise it would yank
+      // focus out from under someone who started typing again right after a
+      // debounced save. Only a genuinely different value (typically the other
+      // person's edit arriving) triggers a redraw.
+      var changed = JSON.stringify(normalizeDay(incoming)) !== JSON.stringify(normalizeDay(state.dayCache[dateStr]));
+      state.dayCache[dateStr] = incoming;
+      if(changed) render();
     }, function(err){ console.error("day sub error", err); showConnNote(true); });
   }
 
@@ -469,14 +476,18 @@
       (function(wd){
         db.doc("template/"+wd).onSnapshot(function(snap){
           showConnNote(false);
+          var wasLoaded = state.templatesLoaded[wd];
+          var changed = true;
           if(snap.exists){
-            state.templates[wd] = normalizeTemplate(snap.data());
-          } else if(!state.templatesLoaded[wd]) {
+            var incoming = normalizeTemplate(snap.data());
+            changed = JSON.stringify(incoming) !== JSON.stringify(state.templates[wd] || null);
+            state.templates[wd] = incoming;
+          } else if(!wasLoaded) {
             db.doc("template/"+wd).set(defaultTemplate()).catch(function(){});
           }
           state.templatesLoaded[wd] = true;
           state.ready = Object.keys(state.templatesLoaded).length >= 7;
-          render();
+          if(changed || !wasLoaded) render();
         }, function(err){ console.error("template sub error", err); showConnNote(true); });
       })(wd);
     }
@@ -810,14 +821,37 @@
     }
   });
 
+  // Typing into a text/time field fires "input" once per keystroke. Re-rendering
+  // the whole app on every keystroke (the old behaviour) replaces the input's DOM
+  // node mid-type, which drops focus and — on a phone — dismisses the keyboard.
+  // So "input" events only update the in-memory data + schedule a debounced
+  // save; nothing re-renders until the person pauses. Discrete controls
+  // (select/checkbox) still apply and re-render immediately since there's no
+  // continuous typing to interrupt there.
+  var dayDebTimers = {};
+  var tplDebTimers = {};
+
   document.getElementById("app").addEventListener("input", function(e){
-    handleFieldChange(e.target);
+    handleFieldChange(e.target, true);
   });
   document.getElementById("app").addEventListener("change", function(e){
-    if(e.target.tagName==="SELECT") handleFieldChange(e.target);
+    if(e.target.tagName==="SELECT") handleFieldChange(e.target, false);
   });
 
-  function handleFieldChange(el){
+  function applyDayChange(dateStr, day, debounced){
+    if(!debounced){ writeDay(dateStr, day); return; }
+    state.dayCache[dateStr] = day;
+    clearTimeout(dayDebTimers[dateStr]);
+    dayDebTimers[dateStr] = setTimeout(function(){ writeDay(dateStr, day); }, 500);
+  }
+  function applyTplChange(wd, tpl, debounced){
+    if(!debounced){ writeTemplate(wd, tpl); return; }
+    state.templates[wd] = tpl;
+    clearTimeout(tplDebTimers[wd]);
+    tplDebTimers[wd] = setTimeout(function(){ writeTemplate(wd, tpl); }, 500);
+  }
+
+  function handleFieldChange(el, debounced){
     var action = el.dataset.action;
     if(!action) return;
 
@@ -825,12 +859,12 @@
       var dateStr = el.dataset.date, person = el.dataset.person, field = el.dataset.field;
       var day = getEffectiveDay(dateStr);
       day.commute[person][field] = el.value;
-      writeDay(dateStr, day);
+      applyDayChange(dateStr, day, debounced);
     } else if(action==="baby-field"){
       var dateStr = el.dataset.date, ev = el.dataset.event, field = el.dataset.field;
       var day = getEffectiveDay(dateStr);
       day.baby[ev][field] = el.value;
-      writeDay(dateStr, day);
+      applyDayChange(dateStr, day, debounced);
     } else if(action==="vehicle-field"){
       var dateStr = el.dataset.date, id = el.dataset.id, field = el.dataset.field;
       var day = getEffectiveDay(dateStr);
@@ -840,7 +874,7 @@
         nv[field] = el.value;
         return nv;
       });
-      writeDay(dateStr, day);
+      applyDayChange(dateStr, day, debounced);
     } else if(action==="chore-field"){
       var dateStr = el.dataset.date, id = el.dataset.id, field = el.dataset.field;
       var day = getEffectiveDay(dateStr);
@@ -850,17 +884,17 @@
         nc[field] = el.value;
         return nc;
       });
-      writeDay(dateStr, day);
+      applyDayChange(dateStr, day, debounced);
     } else if(action==="tpl-commute-field"){
       var wd = Number(el.dataset.weekday), person = el.dataset.person, field = el.dataset.field;
       var tpl = normalizeTemplate(state.templates[wd]);
       tpl.commute[person][field] = el.value;
-      writeTemplate(wd, tpl);
+      applyTplChange(wd, tpl, debounced);
     } else if(action==="tpl-baby-field"){
       var wd = Number(el.dataset.weekday), ev = el.dataset.event, field = el.dataset.field;
       var tpl = normalizeTemplate(state.templates[wd]);
       tpl.baby[ev][field] = el.value;
-      writeTemplate(wd, tpl);
+      applyTplChange(wd, tpl, debounced);
     } else if(action==="tpl-chore-field"){
       var wd = Number(el.dataset.weekday), id = el.dataset.id, field = el.dataset.field;
       var tpl = normalizeTemplate(state.templates[wd]);
@@ -870,7 +904,7 @@
         nc[field] = el.value;
         return nc;
       });
-      writeTemplate(wd, tpl);
+      applyTplChange(wd, tpl, debounced);
     }
   }
 
