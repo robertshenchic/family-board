@@ -75,6 +75,7 @@
   button{ font:inherit; color:inherit; }
   input,select{ font:inherit; color:inherit; background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
   input:focus-visible, select:focus-visible, button:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  input:disabled, select:disabled{ opacity:.55; background:var(--surface-2); cursor:not-allowed; }
 
   /* ---------- top bar ---------- */
   .topbar{
@@ -91,6 +92,9 @@
   .persona-switch{ display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
   .persona-btn{ border:0; background:var(--surface); padding:7px 16px; cursor:pointer; font-size:14px; }
   .persona-btn[data-active="1"]{ background:var(--accent); color:var(--accent-ink); font-weight:600; }
+  .view-badge{ font-size:12px; font-weight:700; color:var(--ink-soft); background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:5px 12px; }
+  .logout-btn{ border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:7px 14px; cursor:pointer; font-size:13px; color:var(--ink-soft); }
+  .logout-btn:hover{ background:var(--surface-2); color:var(--ink); }
 
   /* ---------- nav tabs ---------- */
   .tabs{
@@ -150,6 +154,9 @@
 
   .vrow{ border:1px solid var(--line); border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:6px; }
   .vrow.conflict{ border-color:var(--danger); background:var(--danger-bg); }
+  .vrow.derived{ border-style:dashed; background:var(--surface-2); }
+  .vrow.derived.conflict{ border-style:solid; background:var(--danger-bg); }
+  .derived-tag{ font-size:11px; font-weight:700; letter-spacing:.03em; color:var(--accent); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:2px 8px; }
   .conflict-badge{ font-size:12px; color:var(--danger); font-weight:700; }
 
   .chore-row{ display:flex; align-items:center; gap:8px; }
@@ -204,9 +211,30 @@
   .conn-note{ text-align:center; font-size:12px; padding:6px 10px; }
   .conn-note.offline{ color:var(--danger); background:var(--danger-bg); }
   [hidden]{ display:none!important; }
+
+  .lock-overlay{
+    position:fixed; inset:0; z-index:999; background:var(--paper);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .lock-card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:28px; max-width:340px; width:100%; text-align:center; box-shadow:var(--shadow); }
+  .lock-card h2{ font-family:"Big Shoulders Display",sans-serif; margin:0 0 6px; font-size:22px; }
+  .lock-card p{ color:var(--ink-soft); font-size:14px; margin:0 0 16px; }
+  .lock-card input{ width:100%; margin-bottom:10px; padding:10px; font-size:15px; text-align:center; }
+  .lock-card button{ width:100%; padding:11px; border-radius:10px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); font-weight:700; cursor:pointer; font-size:15px; }
+  .lock-error{ color:var(--danger)!important; font-size:13px!important; margin-top:8px!important; }
 </style>
 </head>
 <body>
+
+<div class="lock-overlay" id="lockGate">
+  <div class="lock-card">
+    <h2>🔒 家庭看板</h2>
+    <p>這是私人看板，請輸入密碼查看。編輯密碼跟觀看密碼不同，之後這台裝置上的瀏覽器不會再問第二次。</p>
+    <input type="password" id="lockInput" placeholder="輸入密碼" autocomplete="off">
+    <button id="lockSubmit">進入看板</button>
+    <p class="lock-error empty-hint" id="lockError" hidden>密碼不對，再試一次</p>
+  </div>
+</div>
 
 <header class="topbar">
   <div class="brand">
@@ -214,10 +242,12 @@
     <span class="brand-sub">Household Dispatch Board</span>
   </div>
   <div class="clock mono" id="headerClock">--:--:--</div>
+  <span class="view-badge" id="viewBadge" hidden>🔍 僅檢視</span>
   <div class="persona-switch" id="personaSwitch">
-    <button class="persona-btn" data-persona="husband">先生</button>
-    <button class="persona-btn" data-persona="wife">太太</button>
+    <button class="persona-btn" data-persona="husband">Robert</button>
+    <button class="persona-btn" data-persona="wife">Claire</button>
   </div>
+  <button class="logout-btn" id="logoutBtn" title="登出，這台裝置下次要重新輸入密碼">🔒 登出</button>
 </header>
 
 <nav class="tabs" id="tabs">
@@ -239,8 +269,8 @@
     <h2>你是誰？</h2>
     <p>選一下身份，之後在看板上輸入的東西會標記是誰填的，也可以隨時在右上角切換。</p>
     <div class="gate-btns">
-      <button data-persona="husband">我是先生</button>
-      <button data-persona="wife">我是太太</button>
+      <button data-persona="husband">我是 Robert</button>
+      <button data-persona="wife">我是 Claire</button>
     </div>
   </div>
 </div>
@@ -290,13 +320,90 @@
 (function(){
   "use strict";
 
+  // ---------------- simple site lock (two tiers) ----------------
+  // NOT real security — both hashes below sit in this page's own source, so
+  // anyone who reads the source and is willing to brute-force it can get in.
+  // It only keeps out casual link-stumblers/crawlers on a public URL.
+  // Two passphrases map to two roles: EDIT_PASSPHRASE_HASH unlocks full
+  // editing (Robert & Claire), VIEW_PASSPHRASE_HASH unlocks read-only viewing
+  // for everyone else. Regenerate a hash with, e.g. in Node:
+  //   require("crypto").createHash("sha256").update("new-passphrase","utf8").digest("hex")
+  var EDIT_PASSPHRASE_HASH = "41f62643df42d7c62b337bd0478cde804104189ac099f8621b92a242b57611c5"; // "033609183"
+  var VIEW_PASSPHRASE_HASH = "615ed7fb1504b0c724a296d7a69e6c7b2f9ea2c57c1d8206c5afdf392ebdfd25"; // "88888888"
+  var ROLE_KEY = "fb_role_v1"; // stored value: "edit" | "view"
+
+  function sha256Hex(str){
+    var data = new TextEncoder().encode(str);
+    return crypto.subtle.digest("SHA-256", data).then(function(buf){
+      return Array.prototype.map.call(new Uint8Array(buf), function(b){ return b.toString(16).padStart(2,"0"); }).join("");
+    });
+  }
+
+  (function initLock(){
+    var overlay = document.getElementById("lockGate");
+    if(!overlay) return;
+    if(localStorage.getItem(ROLE_KEY)){ overlay.hidden = true; return; }
+    var input = document.getElementById("lockInput");
+    var err = document.getElementById("lockError");
+    function trySubmit(){
+      if(!input.value){ return; }
+      if(!window.crypto || !window.crypto.subtle){
+        // Non-secure context (e.g. plain http, not https/localhost) — Web
+        // Crypto isn't available there, so the lock can't be checked at all.
+        err.hidden = false;
+        err.textContent = "這個瀏覽器環境沒辦法驗證密碼（需要 https），請改用正式網址開啟";
+        return;
+      }
+      sha256Hex(input.value).then(function(hash){
+        var role = hash === EDIT_PASSPHRASE_HASH ? "edit" : (hash === VIEW_PASSPHRASE_HASH ? "view" : "");
+        if(role){
+          localStorage.setItem(ROLE_KEY, role);
+          overlay.hidden = true;
+          // The app below already finished its initial render by the time this
+          // promise resolves (state started out defaulting to "edit" since
+          // localStorage had no role yet) — push the real role in now and
+          // re-render so the unlocked view immediately reflects it.
+          if(typeof state === "object" && state){ state.role = role; }
+          if(typeof render === "function"){ render(); }
+        } else {
+          err.hidden = false;
+          err.textContent = "密碼不對，再試一次";
+          input.value = "";
+          input.focus();
+        }
+      });
+    }
+    document.getElementById("lockSubmit").addEventListener("click", trySubmit);
+    input.addEventListener("keydown", function(e){ if(e.key==="Enter") trySubmit(); });
+  })();
+
+  // Forgets this device's unlocked role and shows the password screen again —
+  // e.g. before handing the phone to someone else, or to switch from viewing
+  // to editing. It reuses the same overlay/input the block above already
+  // wired up, so entering a password afterwards works exactly like first time.
+  function showLockGate(){
+    localStorage.removeItem(ROLE_KEY);
+    var overlay = document.getElementById("lockGate");
+    if(!overlay) return;
+    var input = document.getElementById("lockInput");
+    var err = document.getElementById("lockError");
+    if(input){ input.value = ""; }
+    if(err){ err.hidden = true; }
+    overlay.hidden = false;
+    if(input){ input.focus(); }
+  }
+  var logoutBtnEl = document.getElementById("logoutBtn");
+  if(logoutBtnEl) logoutBtnEl.addEventListener("click", showLockGate);
+
   // ---------------- constants ----------------
   var WEEKDAY_LABELS = ["日","一","二","三","四","五","六"]; // index = Date.getDay()
   var WEEKDAY_ORDER = [1,2,3,4,5,6,0]; // display Mon..Sun
-  var PEOPLE_BASIC = [ {id:"husband",label:"先生"}, {id:"wife",label:"太太"} ];
-  var PEOPLE_VEHICLE = [ {id:"husband",label:"先生"}, {id:"wife",label:"太太"}, {id:"fatherInLaw",label:"岳父"}, {id:"other",label:"其他"} ];
-  var MODES = [ {id:"car",label:"🚗 汽車"}, {id:"moto1",label:"🛵 機車1"}, {id:"moto2",label:"🛵 機車2"}, {id:"hsr",label:"🚄 高鐵"}, {id:"other",label:"其他"} ];
-  var RESOURCES = [ {id:"car",label:"汽車"}, {id:"moto1",label:"機車1"}, {id:"moto2",label:"機車2"} ];
+  var PEOPLE_BASIC = [ {id:"husband",label:"Robert"}, {id:"wife",label:"Claire"} ];
+  var PEOPLE_BABY = [ {id:"husband",label:"Robert"}, {id:"wife",label:"Claire"}, {id:"fatherInLaw",label:"岳父"} ];
+  var PEOPLE_VEHICLE = [ {id:"husband",label:"Robert"}, {id:"wife",label:"Claire"}, {id:"fatherInLaw",label:"岳父"}, {id:"other",label:"其他"} ];
+  var RESOURCES = [ {id:"car",label:"🚗 汽車"}, {id:"moto1",label:"🛵 Claire小50"}, {id:"moto2",label:"🏍️ Robert大125"} ];
+  var MODES = [ {id:"car",label:"🚗 汽車"}, {id:"moto1",label:"🛵 Claire小50"}, {id:"moto2",label:"🏍️ Robert大125"}, {id:"hsr",label:"🚄 高鐵"}, {id:"wfh",label:"🏠 在家上班/休假"}, {id:"other",label:"其他"} ];
+  var VEHICLE_MODES = ["car","moto1","moto2"]; // commute modes that represent an actual vehicle worth syncing into the booking list below
   var DEFAULT_CHORES = [
     {id:"laundry", name:"洗衣服", assignee:""},
     {id:"fold", name:"折衣服", assignee:""},
@@ -304,6 +411,7 @@
     {id:"vacuum", name:"吸地板", assignee:""}
   ];
 
+  function isViewOnly(){ return state.role === "view"; }
   function labelOf(list, id){ for(var i=0;i<list.length;i++){ if(list[i].id===id) return list[i].label; } return id||""; }
   function personLabel(who, customLabel){
     if(who==="other") return customLabel || "其他";
@@ -367,6 +475,28 @@
     };
   }
 
+  // A commute set to an actual vehicle (car/moto1/moto2) counts as using that
+  // vehicle for that time window — surface it in the booking list below so a
+  // clash (someone else booking the same vehicle over that window) actually
+  // gets caught, instead of the commute silently not counting as "usage".
+  // These are computed fresh from the commute fields on every render rather
+  // than stored, so there's exactly one source of truth: edit the commute
+  // above and the booking reflects it immediately, with nothing to keep in sync.
+  function deriveCommuteVehicles(day){
+    var out = [];
+    [["husband","Robert"],["wife","Claire"]].forEach(function(pair){
+      var person = pair[0], label = pair[1];
+      var c = day.commute[person];
+      if(c && c.start && c.end && VEHICLE_MODES.indexOf(c.mode) !== -1){
+        out.push({
+          id: "commute-"+person, resource: c.mode, who: person, customLabel: "",
+          start: c.start, end: c.end, note: label+"的通勤", derived: true
+        });
+      }
+    });
+    return out;
+  }
+
   function findConflicts(vehicles){
     var conflictIds = {};
     var byResource = {};
@@ -391,6 +521,7 @@
   var state = {
     db: null,
     persona: localStorage.getItem("fb_persona") || "",
+    role: localStorage.getItem(ROLE_KEY) || "edit", // "edit" | "view" — see lock section above
     view: "day",
     dayOffset: 0,
     customDate: null, // ISO string or null
@@ -399,7 +530,8 @@
     dayCache: {}, // dateStr -> raw doc data or null
     daySubs: {}, // dateStr -> unsubscribe
     tplWdView: (new Date()).getDay(), // which weekday tab open in template editor
-    ready: false
+    ready: false,
+    lastDateStr: toISODate(new Date()) // used to detect the real-world date rolling over past midnight
   };
 
   function currentDateStr(){
@@ -509,16 +641,31 @@
     if(el) el.textContent = s;
     var kel = document.getElementById("kanbanClock");
     if(kel) kel.textContent = s;
+
+    // A page left open across midnight (the TV/看板模式 case especially) needs
+    // "today"/"tomorrow" to roll over on their own — nothing else in the app
+    // re-renders on a timer, so without this check the screen would just sit
+    // on yesterday's dates until something else happened to trigger a redraw.
+    var nowStr = toISODate(now);
+    if(state.ready && nowStr !== state.lastDateStr){
+      state.lastDateStr = nowStr;
+      render();
+    }
   }
   setInterval(pumpClock, 1000);
   pumpClock();
 
   // ---------------- render: shell ----------------
   function updatePersonaUI(){
+    var ro = isViewOnly();
     document.querySelectorAll("#personaSwitch .persona-btn").forEach(function(b){
       b.setAttribute("data-active", b.dataset.persona===state.persona ? "1":"0");
     });
-    document.getElementById("gate").hidden = !!state.persona;
+    // Identity ("who's filling this in") only matters when someone can write
+    // data — a viewer never does, so skip asking and hide the switcher.
+    document.getElementById("personaSwitch").hidden = ro;
+    document.getElementById("gate").hidden = ro || !!state.persona;
+    document.getElementById("viewBadge").hidden = !ro;
   }
   function updateTabsUI(){
     document.querySelectorAll("#tabs .tab-btn").forEach(function(b){
@@ -549,45 +696,66 @@
   }
 
   function commuteRowHtml(dateStr, person, label, data){
+    var ro = isViewOnly() ? ' disabled' : '';
     return '<div class="row">'
       + '<span class="who">'+label+'</span>'
-      + '<input type="time" class="mono" value="'+data.start+'" data-action="commute-field" data-date="'+dateStr+'" data-person="'+person+'" data-field="start">'
+      + '<input type="time" class="mono" value="'+data.start+'"'+ro+' data-action="commute-field" data-date="'+dateStr+'" data-person="'+person+'" data-field="start">'
       + '<span class="sep">–</span>'
-      + '<input type="time" class="mono" value="'+data.end+'" data-action="commute-field" data-date="'+dateStr+'" data-person="'+person+'" data-field="end">'
-      + '<select data-action="commute-field" data-date="'+dateStr+'" data-person="'+person+'" data-field="mode">'
+      + '<input type="time" class="mono" value="'+data.end+'"'+ro+' data-action="commute-field" data-date="'+dateStr+'" data-person="'+person+'" data-field="end">'
+      + '<select'+ro+' data-action="commute-field" data-date="'+dateStr+'" data-person="'+person+'" data-field="mode">'
         + MODES.map(function(m){ return '<option value="'+m.id+'"'+(m.id===data.mode?' selected':'')+'>'+m.label+'</option>'; }).join("")
       + '</select>'
-      + '<input type="text" class="note" placeholder="備註" value="'+escapeAttr(data.note||"")+'" data-action="commute-field" data-date="'+dateStr+'" data-person="'+person+'" data-field="note">'
+      + '<input type="text" class="note" placeholder="備註" value="'+escapeAttr(data.note||"")+'"'+ro+' data-action="commute-field" data-date="'+dateStr+'" data-person="'+person+'" data-field="note">'
       + '</div>';
   }
 
   function escapeAttr(s){ return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
 
+  function derivedVehicleRowHtml(v, isConflict){
+    var resLabel = labelOf(RESOURCES, v.resource);
+    var personLabelText = personLabel(v.who, v.customLabel);
+    return '<div class="vrow derived'+(isConflict?' conflict':'')+'">'
+      + '<div class="row">'
+        + '<span class="derived-tag">🔗 通勤同步</span>'
+        + '<strong>'+resLabel+'</strong>'
+        + '<span class="sep">·</span>'
+        + '<span>'+personLabelText+'</span>'
+        + '<span class="mono">'+v.start+'–'+v.end+'</span>'
+      + '</div>'
+      + '<p class="empty-hint" style="margin:0;">要改時間或交通方式，請到上面「通勤」欄位調整</p>'
+      + (isConflict ? '<span class="conflict-badge">⚠ 這台車此時段被重複登記</span>' : '')
+      + '</div>';
+  }
+
   function vehicleRowHtml(dateStr, v, isConflict){
+    var ro = isViewOnly();
+    var roAttr = ro ? ' disabled' : '';
     var opts = PEOPLE_VEHICLE.map(function(p){ return '<option value="'+p.id+'"'+(p.id===v.who?' selected':'')+'>'+p.label+'</option>'; }).join("");
     var resOpts = RESOURCES.map(function(r){ return '<option value="'+r.id+'"'+(r.id===v.resource?' selected':'')+'>'+r.label+'</option>'; }).join("");
     return '<div class="vrow'+(isConflict?' conflict':'')+'">'
       + '<div class="row">'
-        + '<select data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="resource">'+resOpts+'</select>'
-        + '<select data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="who">'+opts+'</select>'
-        + (v.who==="other" ? '<input type="text" placeholder="是誰" class="note" style="max-width:90px" value="'+escapeAttr(v.customLabel)+'" data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="customLabel">' : '')
-        + '<input type="time" class="mono" value="'+v.start+'" data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="start">'
+        + '<select'+roAttr+' data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="resource">'+resOpts+'</select>'
+        + '<select'+roAttr+' data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="who">'+opts+'</select>'
+        + (v.who==="other" ? '<input type="text" placeholder="是誰" class="note" style="max-width:90px" value="'+escapeAttr(v.customLabel)+'"'+roAttr+' data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="customLabel">' : '')
+        + '<input type="time" class="mono" value="'+v.start+'"'+roAttr+' data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="start">'
         + '<span class="sep">–</span>'
-        + '<input type="time" class="mono" value="'+v.end+'" data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="end">'
-        + '<button class="iconbtn" title="刪除" data-action="vehicle-remove" data-date="'+dateStr+'" data-id="'+v.id+'">✕</button>'
+        + '<input type="time" class="mono" value="'+v.end+'"'+roAttr+' data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="end">'
+        + (ro ? '' : '<button class="iconbtn" title="刪除" data-action="vehicle-remove" data-date="'+dateStr+'" data-id="'+v.id+'">✕</button>')
       + '</div>'
-      + '<input type="text" class="note" placeholder="備註（例如：去哪裡）" value="'+escapeAttr(v.note)+'" data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="note">'
+      + '<input type="text" class="note" placeholder="備註（例如：去哪裡）" value="'+escapeAttr(v.note)+'"'+roAttr+' data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="note">'
       + (isConflict ? '<span class="conflict-badge">⚠ 這台車此時段被重複登記</span>' : '')
       + '</div>';
   }
 
   function choreRowHtml(dateStr, c){
+    var ro = isViewOnly();
+    var roAttr = ro ? ' disabled' : '';
     var opts = '<option value="">未指定</option>' + PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===c.assignee?' selected':'')+'>'+p.label+'</option>'; }).join("");
     return '<div class="chore-row'+(c.done?' done':'')+'">'
-      + '<input type="checkbox" '+(c.done?'checked':'')+' data-action="chore-toggle" data-date="'+dateStr+'" data-id="'+c.id+'">'
-      + '<input type="text" class="cname" value="'+escapeAttr(c.name)+'" data-action="chore-field" data-date="'+dateStr+'" data-id="'+c.id+'" data-field="name">'
-      + '<select data-action="chore-field" data-date="'+dateStr+'" data-id="'+c.id+'" data-field="assignee">'+opts+'</select>'
-      + '<button class="iconbtn" title="刪除" data-action="chore-remove" data-date="'+dateStr+'" data-id="'+c.id+'">✕</button>'
+      + '<input type="checkbox" '+(c.done?'checked':'')+roAttr+' data-action="chore-toggle" data-date="'+dateStr+'" data-id="'+c.id+'">'
+      + '<input type="text" class="cname" value="'+escapeAttr(c.name)+'"'+roAttr+' data-action="chore-field" data-date="'+dateStr+'" data-id="'+c.id+'" data-field="name">'
+      + '<select'+roAttr+' data-action="chore-field" data-date="'+dateStr+'" data-id="'+c.id+'" data-field="assignee">'+opts+'</select>'
+      + (ro ? '' : '<button class="iconbtn" title="刪除" data-action="chore-remove" data-date="'+dateStr+'" data-id="'+c.id+'">✕</button>')
       + '</div>';
   }
 
@@ -603,32 +771,36 @@
     var dateStr = currentDateStr();
     ensureDaySub(dateStr);
     var day = getEffectiveDay(dateStr);
-    var conflicts = findConflicts(day.vehicles);
+    var derivedVehicles = deriveCommuteVehicles(day);
+    var conflicts = findConflicts(derivedVehicles.concat(day.vehicles));
     var parts = dayLabelParts(dateStr);
+    var ro = isViewOnly();
+    var roAttr = ro ? ' disabled' : '';
 
     var heading = '<div class="day-heading"><h1>'+(parts.tag?parts.tag+" ":"")+parts.dateFmt+'</h1><span class="wk">星期'+parts.wk+'</span></div>';
 
-    var commuteBody = commuteRowHtml(dateStr,"husband","先生",day.commute.husband) + commuteRowHtml(dateStr,"wife","太太",day.commute.wife);
+    var commuteBody = commuteRowHtml(dateStr,"husband","Robert",day.commute.husband) + commuteRowHtml(dateStr,"wife","Claire",day.commute.wife);
 
-    var vehicleBody = day.vehicles.length
+    var vehicleBody = derivedVehicles.map(function(v){ return derivedVehicleRowHtml(v, !!conflicts[v.id]); }).join("");
+    vehicleBody += day.vehicles.length
       ? day.vehicles.map(function(v){ return vehicleRowHtml(dateStr, v, !!conflicts[v.id]); }).join("")
-      : '<p class="empty-hint">今天還沒有登記用車，點下面新增。</p>';
-    vehicleBody += '<button class="addbtn" data-action="vehicle-add" data-date="'+dateStr+'">＋ 新增用車登記</button>';
+      : (derivedVehicles.length ? '' : '<p class="empty-hint">今天還沒有登記用車，點下面新增。</p>');
+    if(!ro) vehicleBody += '<button class="addbtn" data-action="vehicle-add" data-date="'+dateStr+'">＋ 新增用車登記</button>';
 
     var babyBody = ''
       + '<div class="row"><span class="who">送</span>'
-        + '<input type="time" class="mono" value="'+day.baby.dropoff.time+'" data-action="baby-field" data-date="'+dateStr+'" data-event="dropoff" data-field="time">'
-        + '<select data-action="baby-field" data-date="'+dateStr+'" data-event="dropoff" data-field="who">'
-          + '<option value="">未指定</option>' + PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===day.baby.dropoff.who?' selected':'')+'>'+p.label+'</option>'; }).join("")
+        + '<input type="time" class="mono" value="'+day.baby.dropoff.time+'"'+roAttr+' data-action="baby-field" data-date="'+dateStr+'" data-event="dropoff" data-field="time">'
+        + '<select'+roAttr+' data-action="baby-field" data-date="'+dateStr+'" data-event="dropoff" data-field="who">'
+          + '<option value="">未指定</option>' + PEOPLE_BABY.map(function(p){ return '<option value="'+p.id+'"'+(p.id===day.baby.dropoff.who?' selected':'')+'>'+p.label+'</option>'; }).join("")
         + '</select></div>'
       + '<div class="row"><span class="who">接</span>'
-        + '<input type="time" class="mono" value="'+day.baby.pickup.time+'" data-action="baby-field" data-date="'+dateStr+'" data-event="pickup" data-field="time">'
-        + '<select data-action="baby-field" data-date="'+dateStr+'" data-event="pickup" data-field="who">'
-          + '<option value="">未指定</option>' + PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===day.baby.pickup.who?' selected':'')+'>'+p.label+'</option>'; }).join("")
+        + '<input type="time" class="mono" value="'+day.baby.pickup.time+'"'+roAttr+' data-action="baby-field" data-date="'+dateStr+'" data-event="pickup" data-field="time">'
+        + '<select'+roAttr+' data-action="baby-field" data-date="'+dateStr+'" data-event="pickup" data-field="who">'
+          + '<option value="">未指定</option>' + PEOPLE_BABY.map(function(p){ return '<option value="'+p.id+'"'+(p.id===day.baby.pickup.who?' selected':'')+'>'+p.label+'</option>'; }).join("")
         + '</select></div>';
 
     var choreBody = (day.chores.length ? day.chores.map(function(c){ return choreRowHtml(dateStr, c); }).join("") : '<p class="empty-hint">目前沒有家務項目。</p>')
-      + '<button class="addbtn" data-action="chore-add" data-date="'+dateStr+'">＋ 新增家務</button>';
+      + (ro ? '' : '<button class="addbtn" data-action="chore-add" data-date="'+dateStr+'">＋ 新增家務</button>');
 
     return heading
       + '<div class="grid">'
@@ -643,27 +815,29 @@
   function renderTemplateView(){
     var wd = state.tplWdView;
     var tpl = normalizeTemplate(state.templates[wd]);
+    var ro = isViewOnly();
+    var roAttr = ro ? ' disabled' : '';
 
     var tabsHtml = '<div class="wd-tabs">' + WEEKDAY_ORDER.map(function(w){
       return '<button class="wd-tab" data-active="'+(w===wd?1:0)+'" data-action="tpl-wd-select" data-weekday="'+w+'">星期'+WEEKDAY_LABELS[w]+'</button>';
     }).join("") + '</div>';
 
-    var commuteBody = tplCommuteRow(wd,"husband","先生",tpl.commute.husband) + tplCommuteRow(wd,"wife","太太",tpl.commute.wife);
+    var commuteBody = tplCommuteRow(wd,"husband","Robert",tpl.commute.husband) + tplCommuteRow(wd,"wife","Claire",tpl.commute.wife);
 
     var babyBody = ''
       + '<div class="row"><span class="who">送</span>'
-        + '<input type="time" class="mono" value="'+tpl.baby.dropoff.time+'" data-action="tpl-baby-field" data-weekday="'+wd+'" data-event="dropoff" data-field="time">'
-        + '<select data-action="tpl-baby-field" data-weekday="'+wd+'" data-event="dropoff" data-field="who">'
-          + '<option value="">未指定</option>' + PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===tpl.baby.dropoff.who?' selected':'')+'>'+p.label+'</option>'; }).join("")
+        + '<input type="time" class="mono" value="'+tpl.baby.dropoff.time+'"'+roAttr+' data-action="tpl-baby-field" data-weekday="'+wd+'" data-event="dropoff" data-field="time">'
+        + '<select'+roAttr+' data-action="tpl-baby-field" data-weekday="'+wd+'" data-event="dropoff" data-field="who">'
+          + '<option value="">未指定</option>' + PEOPLE_BABY.map(function(p){ return '<option value="'+p.id+'"'+(p.id===tpl.baby.dropoff.who?' selected':'')+'>'+p.label+'</option>'; }).join("")
         + '</select></div>'
       + '<div class="row"><span class="who">接</span>'
-        + '<input type="time" class="mono" value="'+tpl.baby.pickup.time+'" data-action="tpl-baby-field" data-weekday="'+wd+'" data-event="pickup" data-field="time">'
-        + '<select data-action="tpl-baby-field" data-weekday="'+wd+'" data-event="pickup" data-field="who">'
-          + '<option value="">未指定</option>' + PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===tpl.baby.pickup.who?' selected':'')+'>'+p.label+'</option>'; }).join("")
+        + '<input type="time" class="mono" value="'+tpl.baby.pickup.time+'"'+roAttr+' data-action="tpl-baby-field" data-weekday="'+wd+'" data-event="pickup" data-field="time">'
+        + '<select'+roAttr+' data-action="tpl-baby-field" data-weekday="'+wd+'" data-event="pickup" data-field="who">'
+          + '<option value="">未指定</option>' + PEOPLE_BABY.map(function(p){ return '<option value="'+p.id+'"'+(p.id===tpl.baby.pickup.who?' selected':'')+'>'+p.label+'</option>'; }).join("")
         + '</select></div>';
 
     var choreBody = (tpl.chores.length ? tpl.chores.map(function(c){ return tplChoreRow(wd,c); }).join("") : '<p class="empty-hint">目前沒有家務項目。</p>')
-      + '<button class="addbtn" data-action="tpl-chore-add" data-weekday="'+wd+'">＋ 新增家務</button>';
+      + (ro ? '' : '<button class="addbtn" data-action="tpl-chore-add" data-weekday="'+wd+'">＋ 新增家務</button>');
 
     return '<div class="day-heading"><h1>預設班表</h1><span class="wk">套用到每週的星期'+WEEKDAY_LABELS[wd]+'，當天有異動再個別修改當天即可</span></div>'
       + tabsHtml
@@ -674,37 +848,42 @@
       + '</div>';
   }
   function tplCommuteRow(wd, person, label, data){
+    var roAttr = isViewOnly() ? ' disabled' : '';
     return '<div class="row">'
       + '<span class="who">'+label+'</span>'
-      + '<input type="time" class="mono" value="'+data.start+'" data-action="tpl-commute-field" data-weekday="'+wd+'" data-person="'+person+'" data-field="start">'
+      + '<input type="time" class="mono" value="'+data.start+'"'+roAttr+' data-action="tpl-commute-field" data-weekday="'+wd+'" data-person="'+person+'" data-field="start">'
       + '<span class="sep">–</span>'
-      + '<input type="time" class="mono" value="'+data.end+'" data-action="tpl-commute-field" data-weekday="'+wd+'" data-person="'+person+'" data-field="end">'
-      + '<select data-action="tpl-commute-field" data-weekday="'+wd+'" data-person="'+person+'" data-field="mode">'
+      + '<input type="time" class="mono" value="'+data.end+'"'+roAttr+' data-action="tpl-commute-field" data-weekday="'+wd+'" data-person="'+person+'" data-field="end">'
+      + '<select'+roAttr+' data-action="tpl-commute-field" data-weekday="'+wd+'" data-person="'+person+'" data-field="mode">'
         + MODES.map(function(m){ return '<option value="'+m.id+'"'+(m.id===data.mode?' selected':'')+'>'+m.label+'</option>'; }).join("")
       + '</select>'
-      + '<input type="text" class="note" placeholder="備註" value="'+escapeAttr(data.note||"")+'" data-action="tpl-commute-field" data-weekday="'+wd+'" data-person="'+person+'" data-field="note">'
+      + '<input type="text" class="note" placeholder="備註" value="'+escapeAttr(data.note||"")+'"'+roAttr+' data-action="tpl-commute-field" data-weekday="'+wd+'" data-person="'+person+'" data-field="note">'
       + '</div>';
   }
   function tplChoreRow(wd, c){
+    var ro = isViewOnly();
+    var roAttr = ro ? ' disabled' : '';
     var opts = '<option value="">未指定</option>' + PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===c.assignee?' selected':'')+'>'+p.label+'</option>'; }).join("");
     return '<div class="chore-row">'
-      + '<input type="text" class="cname" value="'+escapeAttr(c.name)+'" data-action="tpl-chore-field" data-weekday="'+wd+'" data-id="'+c.id+'" data-field="name">'
-      + '<select data-action="tpl-chore-field" data-weekday="'+wd+'" data-id="'+c.id+'" data-field="assignee">'+opts+'</select>'
-      + '<button class="iconbtn" title="刪除" data-action="tpl-chore-remove" data-weekday="'+wd+'" data-id="'+c.id+'">✕</button>'
+      + '<input type="text" class="cname" value="'+escapeAttr(c.name)+'"'+roAttr+' data-action="tpl-chore-field" data-weekday="'+wd+'" data-id="'+c.id+'" data-field="name">'
+      + '<select'+roAttr+' data-action="tpl-chore-field" data-weekday="'+wd+'" data-id="'+c.id+'" data-field="assignee">'+opts+'</select>'
+      + (ro ? '' : '<button class="iconbtn" title="刪除" data-action="tpl-chore-remove" data-weekday="'+wd+'" data-id="'+c.id+'">✕</button>')
       + '</div>';
   }
 
   // ---------------- render: kanban ----------------
   function kanbanColumn(dateStr, title){
     var day = getEffectiveDay(dateStr);
-    var conflicts = findConflicts(day.vehicles);
+    var derivedVehicles = deriveCommuteVehicles(day);
+    var allVehicles = derivedVehicles.concat(day.vehicles);
+    var conflicts = findConflicts(allVehicles);
     var commuteLines = [
-      kLine("先生", day.commute.husband.start && day.commute.husband.end ? (day.commute.husband.start+"–"+day.commute.husband.end+" "+labelOf(MODES,day.commute.husband.mode)) : "尚未設定"),
-      kLine("太太", day.commute.wife.start && day.commute.wife.end ? (day.commute.wife.start+"–"+day.commute.wife.end+" "+labelOf(MODES,day.commute.wife.mode)) : "尚未設定")
+      kLine("Robert", day.commute.husband.start && day.commute.husband.end ? (day.commute.husband.start+"–"+day.commute.husband.end+" "+labelOf(MODES,day.commute.husband.mode)) : "尚未設定"),
+      kLine("Claire", day.commute.wife.start && day.commute.wife.end ? (day.commute.wife.start+"–"+day.commute.wife.end+" "+labelOf(MODES,day.commute.wife.mode)) : "尚未設定")
     ].join("");
 
     var vehicleLines = RESOURCES.map(function(r){
-      var uses = day.vehicles.filter(function(v){ return v.resource===r.id; });
+      var uses = allVehicles.filter(function(v){ return v.resource===r.id; });
       if(!uses.length) return kLine(r.label, "未使用");
       return uses.map(function(v){
         var isC = conflicts[v.id];
@@ -773,10 +952,16 @@
     render();
   });
 
+  // These actions change data; a viewer-role session ignores them even if
+  // something slipped through without a disabled attribute (belt-and-braces —
+  // the visual disabling above is the main defense, this just backstops it).
+  var MUTATING_ACTIONS = ["vehicle-add","vehicle-remove","chore-add","chore-remove","chore-toggle","tpl-chore-add","tpl-chore-remove"];
+
   document.getElementById("app").addEventListener("click", function(e){
     var t = e.target.closest("[data-action]");
     if(!t) return;
     var action = t.dataset.action;
+    if(isViewOnly() && MUTATING_ACTIONS.indexOf(action)!==-1) return;
 
     if(action==="vehicle-add"){
       var dateStr = t.dataset.date;
@@ -854,6 +1039,7 @@
   function handleFieldChange(el, debounced){
     var action = el.dataset.action;
     if(!action) return;
+    if(isViewOnly()) return; // every field-change action writes data; viewers never do
 
     if(action==="commute-field"){
       var dateStr = el.dataset.date, person = el.dataset.person, field = el.dataset.field;
