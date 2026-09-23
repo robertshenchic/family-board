@@ -112,9 +112,20 @@
   main.kanban-active{ max-width:none; padding:0; }
   .topbar[hidden], .tabs[hidden]{ display:none!important; }
 
-  .day-heading{ display:flex; align-items:baseline; gap:10px; margin:4px 2px 16px; flex-wrap:wrap; }
+  .day-heading{
+    display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+    position:sticky; top:0; z-index:20;
+    background:var(--paper);
+    margin:0 -18px 16px; padding:12px 18px 10px;
+    border-bottom:1px solid var(--line);
+  }
   .day-heading h1{ font-family:"Big Shoulders Display",sans-serif; font-weight:800; font-size:30px; margin:0; }
   .day-heading .wk{ color:var(--ink-soft); font-size:15px; }
+  .day-heading.not-today{ background:var(--danger-bg); border-bottom-color:var(--danger); }
+  .not-today-badge{
+    font-size:12px; font-weight:700; color:var(--danger); background:var(--surface);
+    border:1px solid var(--danger); border-radius:999px; padding:4px 10px; margin-left:auto;
+  }
 
   .grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   @media (max-width:700px){ .grid{ grid-template-columns:1fr; } }
@@ -151,18 +162,41 @@
     border-radius:8px; padding:7px 12px; cursor:pointer; font-size:13px; color:var(--accent); font-weight:600;
   }
   .addbtn:hover{ background:var(--surface-2); }
+  .confirmbtn{
+    align-self:flex-start; border:1px solid var(--accent); background:var(--accent);
+    color:var(--accent-ink); border-radius:8px; padding:7px 14px; cursor:pointer; font-size:13px; font-weight:700;
+  }
+  .confirmbtn:hover{ opacity:.9; }
 
   .vrow{ border:1px solid var(--line); border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:6px; }
   .vrow.conflict{ border-color:var(--danger); background:var(--danger-bg); }
   .vrow.derived{ border-style:dashed; background:var(--surface-2); }
   .vrow.derived.conflict{ border-style:solid; background:var(--danger-bg); }
+  .vrow.saved{ border-style:dashed; background:var(--surface-2); }
+  .vrow.saved.conflict{ border-style:solid; background:var(--danger-bg); }
   .derived-tag{ font-size:11px; font-weight:700; letter-spacing:.03em; color:var(--accent); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:2px 8px; }
   .conflict-badge{ font-size:12px; color:var(--danger); font-weight:700; }
+  .row-error{ margin:0; font-size:12px; color:var(--danger); font-weight:700; }
 
   .chore-row{ display:flex; align-items:center; gap:8px; }
   .chore-row input[type="checkbox"]{ width:18px; height:18px; accent-color:var(--success); }
   .chore-row input.cname{ flex:1; min-width:70px; }
   .chore-row.done .cname{ text-decoration:line-through; color:var(--ink-soft); }
+
+  .cat-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .cat-chip{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--accent); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:3px 8px 3px 10px; }
+  .cat-chip-x{ border:0; background:transparent; color:var(--ink-soft); cursor:pointer; font-size:11px; line-height:1; padding:0; }
+  .cat-chip-x:hover{ color:var(--danger); }
+  .cat-group{ display:flex; flex-direction:column; gap:6px; }
+  .cat-group + .cat-group{ margin-top:14px; padding-top:14px; border-top:1px dashed var(--line); }
+  .cat-group-label{ font-size:12px; font-weight:700; letter-spacing:.04em; color:var(--ink-soft); text-transform:uppercase; }
+
+  .shop-row{ border:1px solid var(--line); border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:6px; }
+  .shop-row input[type="checkbox"]{ width:18px; height:18px; accent-color:var(--success); }
+  .shop-row.urgent{ border-color:var(--danger); background:var(--danger-bg); }
+  .shop-row.done .shop-name{ text-decoration:line-through; color:var(--ink-soft); }
+  .shop-name{ flex:1; min-width:70px; }
+  .urgent-text{ color:var(--danger); font-weight:700; }
 
   .empty-hint{ font-size:13px; color:var(--ink-soft); }
 
@@ -193,6 +227,8 @@
   .kanban .k-line .k-lbl{ color:#9CA3A8; }
   .kanban .k-chip{ font-size:12px; padding:2px 8px; border-radius:999px; background:#242830; color:#C9CFD4; }
   .kanban .k-chip.done{ background:var(--success-bg); color:#7CB56A; }
+  .kanban .k-chip.urgent{ background:#4A1F1F; color:#FF8A73; font-weight:700; }
+  .kanban .k-shopping{ margin-top:18px; }
   @keyframes kflash{ 0%{ opacity:.4; } 100%{ opacity:1; } }
   .kanban.refresh .k-grid{ animation:kflash .5s ease; }
   @media (prefers-reduced-motion: reduce){ .kanban.refresh .k-grid{ animation:none; } }
@@ -211,6 +247,14 @@
   .conn-note{ text-align:center; font-size:12px; padding:6px 10px; }
   .conn-note.offline{ color:var(--danger); background:var(--danger-bg); }
   [hidden]{ display:none!important; }
+
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    background:var(--ink); color:var(--paper); padding:10px 20px; border-radius:999px;
+    font-size:14px; font-weight:600; box-shadow:var(--shadow); z-index:2000;
+    opacity:0; transition:opacity .2s ease;
+  }
+  .toast.show{ opacity:1; }
 
   .lock-overlay{
     position:fixed; inset:0; z-index:999; background:var(--paper);
@@ -247,6 +291,7 @@
     <button class="persona-btn" data-persona="husband">Robert</button>
     <button class="persona-btn" data-persona="wife">Claire</button>
   </div>
+  <button class="logout-btn" id="kanbanEnterBtn" title="看板模式（給電視/大螢幕看的整頁摘要）">📺 看板模式</button>
   <button class="logout-btn" id="logoutBtn" title="登出，這台裝置下次要重新輸入密碼">🔒 登出</button>
 </header>
 
@@ -254,7 +299,7 @@
   <button class="tab-btn" data-view="day" data-offset="0">今天</button>
   <button class="tab-btn" data-view="day" data-offset="1">明天</button>
   <button class="tab-btn" data-view="template">預設班表</button>
-  <button class="tab-btn" data-view="kanban">看板模式</button>
+  <button class="tab-btn" data-view="shopping">🛒 購物清單</button>
   <input type="date" id="datePick" class="mono">
 </nav>
 
@@ -276,6 +321,8 @@
 </div>
 
 <p class="footnote" id="footnote">資料即時同步・沒有登入機制，連結請留意保存 · 家庭派工看板</p>
+
+<div class="toast" id="toast" hidden></div>
 
 <script type="module">
   // ---------------- Firebase setup ----------------
@@ -395,6 +442,9 @@
   var logoutBtnEl = document.getElementById("logoutBtn");
   if(logoutBtnEl) logoutBtnEl.addEventListener("click", showLockGate);
 
+  var kanbanEnterBtnEl = document.getElementById("kanbanEnterBtn");
+  if(kanbanEnterBtnEl) kanbanEnterBtnEl.addEventListener("click", function(){ state.view = "kanban"; render(); });
+
   // ---------------- constants ----------------
   var WEEKDAY_LABELS = ["日","一","二","三","四","五","六"]; // index = Date.getDay()
   var WEEKDAY_ORDER = [1,2,3,4,5,6,0]; // display Mon..Sun
@@ -417,6 +467,27 @@
     if(who==="other") return customLabel || "其他";
     return labelOf(PEOPLE_VEHICLE, who) || "未指定";
   }
+  // Visible, unmissable confirmation that a tap actually did something —
+  // separate from #app so it survives the re-render that follows a write.
+  // Mainly here so "did my tap register at all" and "did the save work" are
+  // easy to tell apart when something seems to do nothing.
+  var toastTimer = null;
+  function showToast(msg){
+    var el = document.getElementById("toast");
+    if(!el) return;
+    el.textContent = msg;
+    el.hidden = false;
+    // Force layout so the opacity transition actually plays even if the
+    // element was just unhidden this same tick.
+    void el.offsetWidth;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){
+      el.classList.remove("show");
+      setTimeout(function(){ el.hidden = true; }, 220);
+    }, 1400);
+  }
+
   function genId(){ return "id_"+Math.random().toString(36).slice(2,9); }
   function pad2(n){ return String(n).padStart(2,"0"); }
   function toISODate(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
@@ -508,9 +579,19 @@
           var a=list[i], b=list[j];
           if(!a.start||!a.end||!b.start||!b.end) continue;
           var overlap = a.start < b.end && b.start < a.end;
+          if(!overlap) continue;
           var keyA = a.who + (a.who==="other" ? ":"+a.customLabel : "");
           var keyB = b.who + (b.who==="other" ? ":"+b.customLabel : "");
-          if(overlap && keyA !== keyB){ conflictIds[a.id]=true; conflictIds[b.id]=true; }
+          var samePerson = keyA === keyB;
+          // Same person overlapping is only OK when it's their own commute-sync
+          // window containing their own manually-added errand with that vehicle.
+          // Two independent manual bookings by the same person still conflict.
+          var oneIsOwnDerived = samePerson && (a.derived === true || b.derived === true);
+          if(samePerson && !oneIsOwnDerived){
+            conflictIds[a.id]=true; conflictIds[b.id]=true;
+          } else if(!samePerson){
+            conflictIds[a.id]=true; conflictIds[b.id]=true;
+          }
         }
       }
     });
@@ -530,6 +611,13 @@
     dayCache: {}, // dateStr -> raw doc data or null
     daySubs: {}, // dateStr -> unsubscribe
     tplWdView: (new Date()).getDay(), // which weekday tab open in template editor
+    vehicleEditing: {}, // vehicle id -> true while its row shows the edit form instead of the saved summary
+    vehicleDraft: null, // {dateStr,resource,who,customLabel,start,end,note} while a brand-new registration is being filled in, before it's ever written anywhere
+    shopping: null, // raw {items:[], categories:[]} doc, or null before it's loaded
+    shoppingSub: null, // unsubscribe fn for the shopping doc
+    shoppingEditing: {}, // shopping item id -> true while its row shows the edit form
+    shoppingDraft: null, // {name,category,assignee,due,note} while a brand-new item is being filled in, before it's ever written anywhere
+    categoryDraftOpen: false, // whether the "+ 新增類別" inline input is open
     ready: false,
     lastDateStr: toISODate(new Date()) // used to detect the real-world date rolling over past midnight
   };
@@ -568,16 +656,110 @@
   function ensureDaySub(dateStr){
     if(state.daySubs[dateStr] || !state.db) return;
     state.daySubs[dateStr] = state.db.doc("days/"+dateStr).onSnapshot(function(snap){
+      showConnNote(false);
       var incoming = snap.exists ? snap.data() : null;
-      // Skip the re-render when this snapshot just echoes back data we already
-      // have locally (e.g. confirming our own write) — otherwise it would yank
-      // focus out from under someone who started typing again right after a
-      // debounced save. Only a genuinely different value (typically the other
-      // person's edit arriving) triggers a redraw.
+      // Guard against an out-of-order confirmation: writes go out to the
+      // shared store one at a time, but their server round-trips can finish
+      // out of order (e.g. adding a row, then quickly editing + confirming it
+      // — the "add" write's slower confirmation can arrive AFTER the newer
+      // "confirm" write already landed locally). Without this check, that
+      // late, stale snapshot would silently overwrite the newer data and the
+      // just-confirmed edit would appear to do nothing. Every write stamps
+      // updatedAt, so an incoming snapshot older than what's already showing
+      // locally is stale and gets ignored instead of applied.
+      var localUpdatedAt = (state.dayCache[dateStr] && state.dayCache[dateStr].updatedAt) || 0;
+      var incomingUpdatedAt = (incoming && incoming.updatedAt) || 0;
+      if(incoming && localUpdatedAt && incomingUpdatedAt < localUpdatedAt) return;
       var changed = JSON.stringify(normalizeDay(incoming)) !== JSON.stringify(normalizeDay(state.dayCache[dateStr]));
       state.dayCache[dateStr] = incoming;
       if(changed) render();
     }, function(err){ console.error("day sub error", err); showConnNote(true); });
+  }
+
+  // ---------------- shopping list (not date-scoped — one persistent list) ----------------
+  function defaultShopping(){
+    return { items: [], categories: ["日用品","食物","其他"] };
+  }
+  function normalizeShopping(raw){
+    var base = defaultShopping();
+    if(!raw) return base;
+    var categories = Array.isArray(raw.categories) && raw.categories.length ? raw.categories.slice() : base.categories;
+    var items = Array.isArray(raw.items) ? raw.items.map(function(it){
+      return {
+        id: it.id || genId(),
+        name: it.name || "",
+        category: it.category || (categories[0]||""),
+        assignee: it.assignee || "",
+        due: it.due || "",
+        note: it.note || "",
+        done: !!it.done
+      };
+    }) : [];
+    return { items: items, categories: categories };
+  }
+  function getEffectiveShopping(){
+    return state.shopping ? normalizeShopping(state.shopping) : defaultShopping();
+  }
+  // Red/urgent warning window: due date is today, tomorrow, or already past
+  // (overdue keeps warning until bought or deleted; "tomorrow" gives a day's
+  // lead time instead of the warning appearing only on the due day itself).
+  function isShoppingUrgent(item){
+    if(item.done || !item.due) return false;
+    var tomorrowStr = toISODate(addDays(new Date(),1));
+    return item.due <= tomorrowStr;
+  }
+  function sortShoppingItems(items){
+    return items.slice().sort(function(a,b){
+      if(a.done !== b.done) return a.done ? 1 : -1;
+      var ad = a.due || "9999-99-99", bd = b.due || "9999-99-99";
+      return ad < bd ? -1 : (ad > bd ? 1 : 0);
+    });
+  }
+  // Splits items into one bucket per known category (in category-list order),
+  // each internally sorted so the nearest due date comes first; used by both
+  // the shopping tab and the kanban-mode summary so they group the same way.
+  function groupShoppingByCategory(items, categories){
+    var byCat = {};
+    categories.forEach(function(c){ byCat[c] = []; });
+    var extra = [];
+    items.forEach(function(it){
+      if(byCat.hasOwnProperty(it.category)) byCat[it.category].push(it);
+      else extra.push(it);
+    });
+    var groups = categories.map(function(c){ return { category: c, items: sortShoppingItems(byCat[c]) }; });
+    if(extra.length) groups.push({ category: "其他分類", items: sortShoppingItems(extra) });
+    return groups;
+  }
+  function writeShopping(obj){
+    obj.updatedBy = state.persona;
+    obj.updatedAt = Date.now();
+    state.shopping = obj;
+    render();
+    if(state.db){
+      state.db.doc("shopping/list").set(obj).catch(function(e){ console.error("write shopping failed", e); showConnNote(true); });
+    }
+  }
+  function ensureShoppingSub(){
+    if(state.shoppingSub || !state.db) return;
+    state.shoppingSub = state.db.doc("shopping/list").onSnapshot(function(snap){
+      showConnNote(false);
+      var incoming = snap.exists ? snap.data() : null;
+      // Same stale-write guard as ensureDaySub above.
+      var localUpdatedAt = (state.shopping && state.shopping.updatedAt) || 0;
+      var incomingUpdatedAt = (incoming && incoming.updatedAt) || 0;
+      if(incoming && localUpdatedAt && incomingUpdatedAt < localUpdatedAt) return;
+      if(!incoming){
+        var def = defaultShopping();
+        def.updatedAt = Date.now();
+        state.shopping = def;
+        state.db.doc("shopping/list").set(def).catch(function(){});
+        render();
+        return;
+      }
+      var changed = JSON.stringify(normalizeShopping(incoming)) !== JSON.stringify(normalizeShopping(state.shopping));
+      state.shopping = incoming;
+      if(changed) render();
+    }, function(err){ console.error("shopping sub error", err); showConnNote(true); });
   }
 
   function writeTemplate(wd, tplObj){
@@ -649,6 +831,10 @@
     var nowStr = toISODate(now);
     if(state.ready && nowStr !== state.lastDateStr){
       state.lastDateStr = nowStr;
+      if(!state.customDate){
+        var dp = document.getElementById("datePick");
+        if(dp) dp.value = toISODate(addDays(now, state.dayOffset));
+      }
       render();
     }
   }
@@ -686,6 +872,7 @@
     if(!state.ready){ app.innerHTML = '<p class="empty-hint" style="padding:20px;">載入中…</p>'; return; }
     if(state.view==="day") app.innerHTML = renderDayView();
     else if(state.view==="template") app.innerHTML = renderTemplateView();
+    else if(state.view==="shopping") app.innerHTML = renderShoppingView();
     else if(state.view==="kanban") app.innerHTML = renderKanbanShell();
     pumpClock();
   }
@@ -727,24 +914,144 @@
       + '</div>';
   }
 
+  // Manually-added vehicle rows have two visual states, mirroring the
+  // read-only "通勤同步" block above them so a saved entry is unmistakably
+  // saved instead of looking identical to one still being typed into:
+  //  - "editing": the form (dropdowns/time/note + ✓確認) — shown for a row
+  //    that was just added, or that "✏️ 修改" was tapped on.
+  //  - "saved": a compact read-only summary + 修改/刪除 buttons — shown for
+  //    every row by default once it's been confirmed.
+  // Which state a row is in is tracked in state.vehicleEditing (a set of
+  // ids), which is purely local UI state — it's not written to the shared
+  // day doc, so it resets to "saved" for everyone on a fresh page load.
+  //
+  // While in the editing form, nothing is written or re-rendered on every
+  // keystroke/scroll (see the old debounce-vs-native-time-picker problem);
+  // fields just sit in the DOM until "✓ 確認" reads their current values and
+  // commits/writes/renders in one shot, flipping the row to "saved".
   function vehicleRowHtml(dateStr, v, isConflict){
     var ro = isViewOnly();
-    var roAttr = ro ? ' disabled' : '';
-    var opts = PEOPLE_VEHICLE.map(function(p){ return '<option value="'+p.id+'"'+(p.id===v.who?' selected':'')+'>'+p.label+'</option>'; }).join("");
-    var resOpts = RESOURCES.map(function(r){ return '<option value="'+r.id+'"'+(r.id===v.resource?' selected':'')+'>'+r.label+'</option>'; }).join("");
-    return '<div class="vrow'+(isConflict?' conflict':'')+'">'
+    var editing = !ro && state.vehicleEditing[v.id] === true;
+    return editing ? vehicleEditRowHtml(dateStr, v, isConflict) : vehicleSavedRowHtml(dateStr, v, isConflict, ro);
+  }
+
+  function vehicleSavedRowHtml(dateStr, v, isConflict, ro){
+    var resLabel = labelOf(RESOURCES, v.resource);
+    var personLabelText = personLabel(v.who, v.customLabel);
+    var timeText = (v.start && v.end) ? (v.start+'–'+v.end) : '尚未設定時間';
+    return '<div class="vrow saved'+(isConflict?' conflict':'')+'">'
       + '<div class="row">'
-        + '<select'+roAttr+' data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="resource">'+resOpts+'</select>'
-        + '<select'+roAttr+' data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="who">'+opts+'</select>'
-        + (v.who==="other" ? '<input type="text" placeholder="是誰" class="note" style="max-width:90px" value="'+escapeAttr(v.customLabel)+'"'+roAttr+' data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="customLabel">' : '')
-        + '<input type="time" class="mono" value="'+v.start+'"'+roAttr+' data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="start">'
-        + '<span class="sep">–</span>'
-        + '<input type="time" class="mono" value="'+v.end+'"'+roAttr+' data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="end">'
-        + (ro ? '' : '<button class="iconbtn" title="刪除" data-action="vehicle-remove" data-date="'+dateStr+'" data-id="'+v.id+'">✕</button>')
+        + '<span class="derived-tag">📌 已登記</span>'
+        + '<strong>'+resLabel+'</strong>'
+        + '<span class="sep">·</span>'
+        + '<span>'+personLabelText+'</span>'
+        + '<span class="mono">'+timeText+'</span>'
       + '</div>'
-      + '<input type="text" class="note" placeholder="備註（例如：去哪裡）" value="'+escapeAttr(v.note)+'"'+roAttr+' data-action="vehicle-field" data-date="'+dateStr+'" data-id="'+v.id+'" data-field="note">'
+      + (v.note ? '<p class="empty-hint" style="margin:0;">'+escapeAttr(v.note)+'</p>' : '')
+      + (ro ? '' : (
+          '<div class="row">'
+          + '<button class="iconbtn" title="修改" data-action="vehicle-edit" data-date="'+dateStr+'" data-id="'+v.id+'">✏️</button>'
+          + '<button class="iconbtn" title="刪除" data-action="vehicle-remove" data-date="'+dateStr+'" data-id="'+v.id+'">✕</button>'
+          + '</div>'
+        ))
       + (isConflict ? '<span class="conflict-badge">⚠ 這台車此時段被重複登記</span>' : '')
       + '</div>';
+  }
+
+  function vehicleEditRowHtml(dateStr, v, isConflict){
+    var opts = PEOPLE_VEHICLE.map(function(p){ return '<option value="'+p.id+'"'+(p.id===v.who?' selected':'')+'>'+p.label+'</option>'; }).join("");
+    var resOpts = RESOURCES.map(function(r){ return '<option value="'+r.id+'"'+(r.id===v.resource?' selected':'')+'>'+r.label+'</option>'; }).join("");
+    return '<div class="vrow'+(isConflict?' conflict':'')+'" data-date="'+dateStr+'" data-id="'+v.id+'">'
+      + '<div class="row">'
+        + '<select data-action="vehicle-field" data-field="resource">'+resOpts+'</select>'
+        + '<select data-action="vehicle-field" data-field="who">'+opts+'</select>'
+        + (v.who==="other" ? '<input type="text" placeholder="是誰" class="note" style="max-width:90px" value="'+escapeAttr(v.customLabel)+'" data-action="vehicle-field" data-field="customLabel">' : '')
+        + '<input type="time" class="mono" value="'+v.start+'" data-action="vehicle-field" data-field="start">'
+        + '<span class="sep">–</span>'
+        + '<input type="time" class="mono" value="'+v.end+'" data-action="vehicle-field" data-field="end">'
+        + '<button class="iconbtn" title="刪除" data-action="vehicle-remove" data-date="'+dateStr+'" data-id="'+v.id+'">✕</button>'
+      + '</div>'
+      + '<input type="text" class="note" placeholder="備註（例如：去哪裡）" value="'+escapeAttr(v.note)+'" data-action="vehicle-field" data-field="note">'
+      + '<p class="row-error" hidden></p>'
+      + '<button class="confirmbtn" data-action="vehicle-confirm" data-date="'+dateStr+'" data-id="'+v.id+'">✓ 確認</button>'
+      + (isConflict ? '<span class="conflict-badge">⚠ 這台車此時段被重複登記</span>' : '')
+      + '</div>';
+  }
+
+  // A brand-new registration lives only here (never written to the shared
+  // day doc) until it passes validation and the person taps "確認新增" —
+  // so an unconfigured/blank row can never be saved, and cancelling just
+  // discards it with nothing left behind.
+  function vehicleDraftRowHtml(dateStr, draft){
+    var opts = PEOPLE_VEHICLE.map(function(p){ return '<option value="'+p.id+'"'+(p.id===draft.who?' selected':'')+'>'+p.label+'</option>'; }).join("");
+    var resOpts = RESOURCES.map(function(r){ return '<option value="'+r.id+'"'+(r.id===draft.resource?' selected':'')+'>'+r.label+'</option>'; }).join("");
+    return '<div class="vrow" data-date="'+dateStr+'" data-id="__draft__">'
+      + '<div class="row">'
+        + '<select data-action="vehicle-field" data-field="resource">'+resOpts+'</select>'
+        + '<select data-action="vehicle-field" data-field="who">'+opts+'</select>'
+        + (draft.who==="other" ? '<input type="text" placeholder="是誰" class="note" style="max-width:90px" value="'+escapeAttr(draft.customLabel)+'" data-action="vehicle-field" data-field="customLabel">' : '')
+        + '<input type="time" class="mono" value="'+draft.start+'" data-action="vehicle-field" data-field="start">'
+        + '<span class="sep">–</span>'
+        + '<input type="time" class="mono" value="'+draft.end+'" data-action="vehicle-field" data-field="end">'
+        + '<button class="iconbtn" title="取消" data-action="vehicle-draft-cancel" data-date="'+dateStr+'">✕</button>'
+      + '</div>'
+      + '<input type="text" class="note" placeholder="備註（例如：去哪裡）" value="'+escapeAttr(draft.note)+'" data-action="vehicle-field" data-field="note">'
+      + '<p class="row-error" hidden></p>'
+      + '<button class="confirmbtn" data-action="vehicle-draft-confirm" data-date="'+dateStr+'">✓ 確認新增</button>'
+      + '</div>';
+  }
+
+  function readVehicleFieldsFromRow(row){
+    var resourceEl = row.querySelector('[data-field="resource"]');
+    var whoEl = row.querySelector('[data-field="who"]');
+    var customLabelEl = row.querySelector('[data-field="customLabel"]');
+    var startEl = row.querySelector('[data-field="start"]');
+    var endEl = row.querySelector('[data-field="end"]');
+    var noteEl = row.querySelector('[data-field="note"]');
+    return {
+      resource: resourceEl ? resourceEl.value : "",
+      who: whoEl ? whoEl.value : "",
+      customLabel: customLabelEl ? customLabelEl.value : "",
+      start: startEl ? startEl.value : "",
+      end: endEl ? endEl.value : "",
+      note: noteEl ? noteEl.value : ""
+    };
+  }
+
+  function validateVehicleFields(fields){
+    if(!fields.resource) return "請選擇車輛";
+    if(!fields.who) return "請選擇是誰使用";
+    if(fields.who==="other" && !fields.customLabel.trim()) return "請填寫「其他」是誰使用";
+    if(!fields.start || !fields.end) return "請設定開始與結束時間";
+    if(fields.start >= fields.end) return "結束時間必須晚於開始時間";
+    return null;
+  }
+
+  function showRowError(row, message){
+    var el = row.querySelector(".row-error");
+    if(!el) return;
+    if(!message){ el.hidden = true; el.textContent = ""; return; }
+    el.hidden = false;
+    el.textContent = "⚠ " + message;
+  }
+
+  function toggleVehicleCustomLabel(selectEl){
+    var row = selectEl.closest(".vrow");
+    if(!row) return;
+    var existing = row.querySelector('[data-field="customLabel"]');
+    if(selectEl.value==="other"){
+      if(existing) return;
+      var input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "是誰";
+      input.className = "note";
+      input.style.maxWidth = "90px";
+      input.setAttribute("data-action","vehicle-field");
+      input.setAttribute("data-field","customLabel");
+      selectEl.insertAdjacentElement("afterend", input);
+    } else if(existing){
+      existing.remove();
+    }
   }
 
   function choreRowHtml(dateStr, c){
@@ -759,12 +1066,157 @@
       + '</div>';
   }
 
+  // ---------------- shopping list rows ----------------
+  // Same three-state pattern as the vehicle rows above (saved / edit / draft),
+  // for the same reason: a native date picker on mobile gets interrupted by
+  // a mid-tap re-render, so nothing writes until an explicit confirm.
+  function shoppingRowHtml(item, ro, categories){
+    var editing = !ro && state.shoppingEditing[item.id] === true;
+    return editing ? shoppingEditRowHtml(item, categories) : shoppingSavedRowHtml(item, ro);
+  }
+
+  function shoppingSavedRowHtml(item, ro){
+    var roAttr = ro ? ' disabled' : '';
+    var assigneeLabel = item.assignee ? labelOf(PEOPLE_BASIC, item.assignee) : "未指定";
+    var urgent = isShoppingUrgent(item);
+    var dueText = item.due ? item.due : "沒有期限";
+    return '<div class="shop-row'+(item.done?' done':'')+(urgent?' urgent':'')+'">'
+      + '<div class="row">'
+        + '<input type="checkbox" '+(item.done?'checked':'')+roAttr+' data-action="shopping-toggle" data-id="'+item.id+'">'
+        + '<strong class="shop-name">'+escapeAttr(item.name)+'</strong>'
+        + '<span class="cat-chip">'+escapeAttr(item.category)+'</span>'
+        + '<span class="sep">·</span>'
+        + '<span>'+assigneeLabel+'</span>'
+        + '<span class="mono'+(urgent?' urgent-text':'')+'">'+dueText+(urgent?' ⚠':'')+'</span>'
+      + '</div>'
+      + (item.note ? '<p class="empty-hint" style="margin:0;">'+escapeAttr(item.note)+'</p>' : '')
+      + (ro ? '' : (
+          '<div class="row">'
+          + '<button class="iconbtn" title="修改" data-action="shopping-edit" data-id="'+item.id+'">✏️</button>'
+          + '<button class="iconbtn" title="刪除" data-action="shopping-remove" data-id="'+item.id+'">✕</button>'
+          + '</div>'
+        ))
+      + '</div>';
+  }
+
+  function shoppingEditRowHtml(item, categories){
+    // If this item's category was since deleted, keep showing it (marked as
+    // deleted) instead of silently snapping the select to whatever category
+    // happens to be first — otherwise just opening "修改" and tapping 確認
+    // without touching anything would quietly move the item to a different
+    // category.
+    var catList = categories.slice();
+    if(item.category && catList.indexOf(item.category)===-1) catList = [item.category].concat(catList);
+    var catOpts = catList.map(function(c){
+      var isOrphan = categories.indexOf(c)===-1;
+      return '<option value="'+escapeAttr(c)+'"'+(c===item.category?' selected':'')+'>'+escapeAttr(c)+(isOrphan?'（已刪除）':'')+'</option>';
+    }).join("");
+    var whoOpts = PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===item.assignee?' selected':'')+'>'+p.label+'</option>'; }).join("");
+    return '<div class="shop-row" data-id="'+item.id+'">'
+      + '<div class="row">'
+        + '<input type="text" class="note" placeholder="要買的東西" value="'+escapeAttr(item.name)+'" data-action="shopping-field" data-field="name">'
+        + '<select data-action="shopping-field" data-field="category">'+catOpts+'</select>'
+      + '</div>'
+      + '<div class="row">'
+        + '<select data-action="shopping-field" data-field="assignee"><option value="">未指定</option>'+whoOpts+'</select>'
+        + '<input type="date" class="mono" value="'+item.due+'" data-action="shopping-field" data-field="due">'
+        + '<button class="iconbtn" title="刪除" data-action="shopping-remove" data-id="'+item.id+'">✕</button>'
+      + '</div>'
+      + '<input type="text" class="note" placeholder="備註" value="'+escapeAttr(item.note)+'" data-action="shopping-field" data-field="note">'
+      + '<p class="row-error" hidden></p>'
+      + '<button class="confirmbtn" data-action="shopping-confirm" data-id="'+item.id+'">✓ 確認</button>'
+      + '</div>';
+  }
+
+  // A brand-new item lives only here (never written to the shared shopping
+  // doc) until it passes validation and the person taps "確認新增".
+  function shoppingDraftRowHtml(draft, categories){
+    var catOpts = categories.map(function(c){ return '<option value="'+escapeAttr(c)+'"'+(c===draft.category?' selected':'')+'>'+escapeAttr(c)+'</option>'; }).join("");
+    var whoOpts = PEOPLE_BASIC.map(function(p){ return '<option value="'+p.id+'"'+(p.id===draft.assignee?' selected':'')+'>'+p.label+'</option>'; }).join("");
+    return '<div class="shop-row">'
+      + '<div class="row">'
+        + '<input type="text" class="note" placeholder="要買的東西" value="'+escapeAttr(draft.name)+'" data-action="shopping-field" data-field="name">'
+        + '<select data-action="shopping-field" data-field="category">'+catOpts+'</select>'
+      + '</div>'
+      + '<div class="row">'
+        + '<select data-action="shopping-field" data-field="assignee"><option value="">未指定</option>'+whoOpts+'</select>'
+        + '<input type="date" class="mono" value="'+draft.due+'" data-action="shopping-field" data-field="due">'
+        + '<button class="iconbtn" title="取消" data-action="shopping-draft-cancel">✕</button>'
+      + '</div>'
+      + '<input type="text" class="note" placeholder="備註" value="'+escapeAttr(draft.note)+'" data-action="shopping-field" data-field="note">'
+      + '<p class="row-error" hidden></p>'
+      + '<button class="confirmbtn" data-action="shopping-draft-confirm">✓ 確認新增</button>'
+      + '</div>';
+  }
+
+  function readShoppingFieldsFromRow(row){
+    var nameEl = row.querySelector('[data-field="name"]');
+    var catEl = row.querySelector('[data-field="category"]');
+    var assigneeEl = row.querySelector('[data-field="assignee"]');
+    var dueEl = row.querySelector('[data-field="due"]');
+    var noteEl = row.querySelector('[data-field="note"]');
+    return {
+      name: nameEl ? nameEl.value.trim() : "",
+      category: catEl ? catEl.value : "",
+      assignee: assigneeEl ? assigneeEl.value : "",
+      due: dueEl ? dueEl.value : "",
+      note: noteEl ? noteEl.value : ""
+    };
+  }
+
+  function validateShoppingFields(fields){
+    if(!fields.name) return "請填寫要買的東西";
+    if(!fields.category) return "請選擇類別";
+    return null;
+  }
+
+  function categoryChipsHtml(categories, ro){
+    var chips = categories.map(function(c){
+      var del = ro ? '' : '<button class="cat-chip-x" data-action="category-remove" data-category="'+escapeAttr(c)+'" title="刪除類別">✕</button>';
+      return '<span class="cat-chip">'+escapeAttr(c)+del+'</span>';
+    }).join("");
+    if(ro) return '<div class="cat-row">'+chips+'</div>';
+    var addUi = state.categoryDraftOpen
+      ? ('<input type="text" id="newCatInput" class="note" placeholder="新類別名稱" style="max-width:140px">'
+          + '<button class="iconbtn" title="確認新增類別" data-action="category-add-confirm">✓</button>'
+          + '<button class="iconbtn" title="取消" data-action="category-add-cancel">✕</button>')
+      : '<button class="addbtn" data-action="category-add-open">+ 新增類別</button>';
+    return '<div class="cat-row">'+chips+addUi+'</div>';
+  }
+
+  function renderShoppingView(){
+    ensureShoppingSub();
+    var shopping = getEffectiveShopping();
+    var ro = isViewOnly();
+
+    var heading = '<div class="day-heading"><h1>🛒 購物清單</h1></div>';
+
+    var catBody = categoryChipsHtml(shopping.categories, ro);
+
+    var groups = groupShoppingByCategory(shopping.items, shopping.categories);
+    var nonEmptyGroups = groups.filter(function(g){ return g.items.length; });
+    var listBody = nonEmptyGroups.length
+      ? nonEmptyGroups.map(function(g){
+          return '<div class="cat-group"><div class="cat-group-label">'+escapeAttr(g.category)+'</div>'
+            + g.items.map(function(it){ return shoppingRowHtml(it, ro, shopping.categories); }).join("")
+            + '</div>';
+        }).join("")
+      : '<p class="empty-hint">目前沒有要買的東西，點下面新增。</p>';
+    var draftOpen = !ro && !!state.shoppingDraft;
+    if(draftOpen) listBody += shoppingDraftRowHtml(state.shoppingDraft, shopping.categories);
+    if(!ro && !draftOpen) listBody += '<button class="addbtn" data-action="shopping-add">＋ 新增項目</button>';
+
+    return heading
+      + sectionCard("類別", catBody)
+      + sectionCard("清單", listBody);
+  }
+
   function dayLabelParts(dateStr){
     var d = parseISODate(dateStr);
     var todayStr = toISODate(new Date());
     var tomorrowStr = toISODate(addDays(new Date(),1));
     var tag = dateStr===todayStr ? "今天" : (dateStr===tomorrowStr ? "明天" : "");
-    return { tag: tag, dateFmt: (d.getMonth()+1)+"/"+d.getDate(), wk: WEEKDAY_LABELS[d.getDay()] };
+    return { tag: tag, dateFmt: (d.getMonth()+1)+"/"+d.getDate(), wk: WEEKDAY_LABELS[d.getDay()], isToday: dateStr===todayStr };
   }
 
   function renderDayView(){
@@ -777,7 +1229,9 @@
     var ro = isViewOnly();
     var roAttr = ro ? ' disabled' : '';
 
-    var heading = '<div class="day-heading"><h1>'+(parts.tag?parts.tag+" ":"")+parts.dateFmt+'</h1><span class="wk">星期'+parts.wk+'</span></div>';
+    var heading = '<div class="day-heading'+(parts.isToday?'':' not-today')+'"><h1>'+(parts.tag?parts.tag+" ":"")+parts.dateFmt+'</h1><span class="wk">星期'+parts.wk+'</span>'
+      + (parts.isToday ? '' : '<span class="not-today-badge">⚠ 不是今天，正在編輯這一天的內容</span>')
+      + '</div>';
 
     var commuteBody = commuteRowHtml(dateStr,"husband","Robert",day.commute.husband) + commuteRowHtml(dateStr,"wife","Claire",day.commute.wife);
 
@@ -785,7 +1239,9 @@
     vehicleBody += day.vehicles.length
       ? day.vehicles.map(function(v){ return vehicleRowHtml(dateStr, v, !!conflicts[v.id]); }).join("")
       : (derivedVehicles.length ? '' : '<p class="empty-hint">今天還沒有登記用車，點下面新增。</p>');
-    if(!ro) vehicleBody += '<button class="addbtn" data-action="vehicle-add" data-date="'+dateStr+'">＋ 新增用車登記</button>';
+    var draftOpen = !ro && !!(state.vehicleDraft && state.vehicleDraft.dateStr === dateStr);
+    if(draftOpen) vehicleBody += vehicleDraftRowHtml(dateStr, state.vehicleDraft);
+    if(!ro && !draftOpen) vehicleBody += '<button class="addbtn" data-action="vehicle-add" data-date="'+dateStr+'">＋ 新增用車登記</button>';
 
     var babyBody = ''
       + '<div class="row"><span class="who">送</span>'
@@ -908,10 +1364,27 @@
   function kLine(label, val, conflict){
     return '<div class="k-line'+(conflict?' conflict':'')+'"><span class="k-lbl">'+label+'</span><span class="k-val">'+val+(conflict?' ⚠':'')+'</span></div>';
   }
+  function kanbanShoppingSection(){
+    var shopping = getEffectiveShopping();
+    var pending = shopping.items.filter(function(it){ return !it.done; });
+    var groups = groupShoppingByCategory(pending, shopping.categories).filter(function(g){ return g.items.length; });
+    var body = groups.length ? groups.map(function(g){
+      var chips = g.items.map(function(it){
+        var urgent = isShoppingUrgent(it);
+        return '<span class="k-chip'+(urgent?' urgent':'')+'">'+(urgent?'⚠ ':'')+escapeAttr(it.name)
+          + (it.assignee?'・'+labelOf(PEOPLE_BASIC,it.assignee):'')
+          + (it.due?'・'+it.due:'')
+          + '</span>';
+      }).join(" ");
+      return '<div class="k-sec"><div class="k-sec-label">'+escapeAttr(g.category)+'</div><div style="display:flex;gap:8px;flex-wrap:wrap;">'+chips+'</div></div>';
+    }).join("") : '<div class="k-sec"><span class="k-chip">沒有要買的東西</span></div>';
+    return '<div class="k-col k-shopping"><h2>🛒 待買清單</h2>'+body+'</div>';
+  }
   function renderKanbanShell(){
     var todayStr = toISODate(new Date());
     var tomorrowStr = toISODate(addDays(new Date(),1));
     ensureDaySub(todayStr); ensureDaySub(tomorrowStr);
+    ensureShoppingSub();
     var d = new Date();
     var dateFmt = (d.getMonth()+1)+"/"+d.getDate()+"（星期"+WEEKDAY_LABELS[d.getDay()]+"）";
     return '<div class="kanban" id="kanbanRoot">'
@@ -919,6 +1392,7 @@
       + '<div class="k-clock mono" id="kanbanClock">--:--:--</div>'
       + '<button class="k-exit" data-action="exit-kanban">離開看板模式</button></div>'
       + '<div class="k-grid">' + kanbanColumn(todayStr,"今天") + kanbanColumn(tomorrowStr,"明天") + '</div>'
+      + kanbanShoppingSection()
       + '</div>';
   }
 
@@ -943,7 +1417,14 @@
     var btn = e.target.closest(".tab-btn");
     if(!btn) return;
     state.view = btn.dataset.view;
-    if(btn.dataset.view==="day"){ state.dayOffset = Number(btn.dataset.offset); state.customDate = null; document.getElementById("datePick").value=""; }
+    if(btn.dataset.view==="day"){
+      state.dayOffset = Number(btn.dataset.offset);
+      state.customDate = null;
+      // Keep the picker showing whichever date "今天"/"明天" actually points
+      // to, instead of blanking it — otherwise it looks like the date was
+      // wiped every time you tap back to today/tomorrow.
+      document.getElementById("datePick").value = toISODate(addDays(new Date(), state.dayOffset));
+    }
     render();
   });
   document.getElementById("datePick").addEventListener("change", function(e){
@@ -951,11 +1432,15 @@
     state.view = "day"; state.customDate = e.target.value;
     render();
   });
+  // Default the date picker to today's date so it doesn't look empty/unclickable
+  // on first load; this only sets what's displayed, it does not touch
+  // state.customDate, so "今天"/"明天" tab behaviour is unaffected.
+  document.getElementById("datePick").value = toISODate(new Date());
 
   // These actions change data; a viewer-role session ignores them even if
   // something slipped through without a disabled attribute (belt-and-braces —
   // the visual disabling above is the main defense, this just backstops it).
-  var MUTATING_ACTIONS = ["vehicle-add","vehicle-remove","chore-add","chore-remove","chore-toggle","tpl-chore-add","tpl-chore-remove"];
+  var MUTATING_ACTIONS = ["vehicle-add","vehicle-remove","vehicle-confirm","vehicle-edit","vehicle-draft-confirm","vehicle-draft-cancel","chore-add","chore-remove","chore-toggle","tpl-chore-add","tpl-chore-remove","shopping-add","shopping-remove","shopping-confirm","shopping-edit","shopping-draft-confirm","shopping-draft-cancel","shopping-toggle","category-add-open","category-add-cancel","category-add-confirm","category-remove"];
 
   document.getElementById("app").addEventListener("click", function(e){
     var t = e.target.closest("[data-action]");
@@ -964,14 +1449,36 @@
     if(isViewOnly() && MUTATING_ACTIONS.indexOf(action)!==-1) return;
 
     if(action==="vehicle-add"){
+      // Nothing is written yet — this just opens a local draft form. It only
+      // becomes a real registration (and gets written) once it passes
+      // validation and the person taps "確認新增"; see vehicle-draft-confirm.
       var dateStr = t.dataset.date;
+      state.vehicleDraft = {dateStr: dateStr, resource:"car", who: state.persona || "husband", customLabel:"", start:"", end:"", note:""};
+      render();
+    } else if(action==="vehicle-draft-cancel"){
+      state.vehicleDraft = null;
+      render();
+    } else if(action==="vehicle-draft-confirm"){
+      var dateStr = t.dataset.date;
+      var row = t.closest(".vrow");
+      if(!row) return;
+      var fields = readVehicleFieldsFromRow(row);
+      var err = validateVehicleFields(fields);
+      if(err){ showRowError(row, err); return; }
       var day = getEffectiveDay(dateStr);
-      day.vehicles.push({id:genId(), resource:"car", who: state.persona || "husband", customLabel:"", start:"", end:"", note:""});
+      day.vehicles.push(Object.assign({id: genId()}, fields));
+      state.vehicleDraft = null;
       writeDay(dateStr, day);
+      showToast("✓ 已新增用車登記");
+    } else if(action==="vehicle-edit"){
+      var id = t.dataset.id;
+      state.vehicleEditing[id] = true;
+      render();
     } else if(action==="vehicle-remove"){
       var dateStr = t.dataset.date, id = t.dataset.id;
       var day = getEffectiveDay(dateStr);
       day.vehicles = day.vehicles.filter(function(v){ return v.id!==id; });
+      delete state.vehicleEditing[id];
       writeDay(dateStr, day);
     } else if(action==="chore-add"){
       var dateStr = t.dataset.date;
@@ -988,6 +1495,21 @@
       var day = getEffectiveDay(dateStr);
       day.chores = day.chores.map(function(c){ return c.id===id ? Object.assign({}, c, {done:!c.done}) : c; });
       writeDay(dateStr, day);
+    } else if(action==="vehicle-confirm"){
+      var dateStr = t.dataset.date, id = t.dataset.id;
+      var row = t.closest(".vrow");
+      if(!row) return;
+      var fields = readVehicleFieldsFromRow(row);
+      var err = validateVehicleFields(fields);
+      if(err){ showRowError(row, err); return; }
+      var day = getEffectiveDay(dateStr);
+      day.vehicles = day.vehicles.map(function(v){
+        if(v.id!==id) return v;
+        return Object.assign({}, v, fields);
+      });
+      delete state.vehicleEditing[id]; // flip this row from the edit form to the saved summary
+      writeDay(dateStr, day);
+      showToast("✓ 已儲存");
     } else if(action==="tpl-wd-select"){
       state.tplWdView = Number(t.dataset.weekday);
       render();
@@ -1003,6 +1525,79 @@
       writeTemplate(wd, tpl);
     } else if(action==="exit-kanban"){
       state.view = "day"; render();
+    } else if(action==="shopping-add"){
+      // Just like vehicle-add: open a local draft, write nothing yet.
+      var shopping = getEffectiveShopping();
+      state.shoppingDraft = { name:"", category: shopping.categories[0] || "", assignee:"", due:"", note:"" };
+      render();
+    } else if(action==="shopping-draft-cancel"){
+      state.shoppingDraft = null;
+      render();
+    } else if(action==="shopping-draft-confirm"){
+      var row = t.closest(".shop-row");
+      if(!row) return;
+      var fields = readShoppingFieldsFromRow(row);
+      var err = validateShoppingFields(fields);
+      if(err){ showRowError(row, err); return; }
+      var shopping = getEffectiveShopping();
+      shopping.items.push(Object.assign({id: genId(), done:false}, fields));
+      state.shoppingDraft = null;
+      writeShopping(shopping);
+      showToast("✓ 已新增購物項目");
+    } else if(action==="shopping-edit"){
+      state.shoppingEditing[t.dataset.id] = true;
+      render();
+    } else if(action==="shopping-remove"){
+      var id = t.dataset.id;
+      var shopping = getEffectiveShopping();
+      shopping.items = shopping.items.filter(function(it){ return it.id!==id; });
+      delete state.shoppingEditing[id];
+      writeShopping(shopping);
+    } else if(action==="shopping-confirm"){
+      var id = t.dataset.id;
+      var row = t.closest(".shop-row");
+      if(!row) return;
+      var fields = readShoppingFieldsFromRow(row);
+      var err = validateShoppingFields(fields);
+      if(err){ showRowError(row, err); return; }
+      var shopping = getEffectiveShopping();
+      shopping.items = shopping.items.map(function(it){ return it.id===id ? Object.assign({}, it, fields) : it; });
+      delete state.shoppingEditing[id];
+      writeShopping(shopping);
+      showToast("✓ 已儲存");
+    } else if(action==="shopping-toggle"){
+      var id = t.dataset.id;
+      var shopping = getEffectiveShopping();
+      shopping.items = shopping.items.map(function(it){ return it.id===id ? Object.assign({}, it, {done: !it.done}) : it; });
+      writeShopping(shopping);
+    } else if(action==="category-add-open"){
+      state.categoryDraftOpen = true;
+      render();
+    } else if(action==="category-add-cancel"){
+      state.categoryDraftOpen = false;
+      render();
+    } else if(action==="category-add-confirm"){
+      var input = document.getElementById("newCatInput");
+      var name = input ? input.value.trim() : "";
+      if(!name){ showToast("請輸入類別名稱"); return; }
+      var shopping = getEffectiveShopping();
+      if(shopping.categories.indexOf(name) !== -1){ showToast("這個類別已經存在"); return; }
+      shopping.categories.push(name);
+      state.categoryDraftOpen = false;
+      writeShopping(shopping);
+      showToast("✓ 已新增類別："+name);
+    } else if(action==="category-remove"){
+      var cat = t.dataset.category;
+      var shopping = getEffectiveShopping();
+      if(shopping.categories.length <= 1){ showToast("至少要保留一個類別"); return; }
+      // Items keep whatever category string they already had — nothing is
+      // deleted or reassigned. groupShoppingByCategory() already buckets any
+      // item whose category isn't in the known list under "其他分類", so a
+      // deleted category's old items just surface there instead of vanishing.
+      var affected = shopping.items.filter(function(it){ return it.category===cat; }).length;
+      shopping.categories = shopping.categories.filter(function(c){ return c!==cat; });
+      writeShopping(shopping);
+      showToast(affected > 0 ? ("✓ 已刪除類別，"+affected+" 個項目移到「其他分類」") : "✓ 已刪除類別");
     }
   });
 
@@ -1052,15 +1647,16 @@
       day.baby[ev][field] = el.value;
       applyDayChange(dateStr, day, debounced);
     } else if(action==="vehicle-field"){
-      var dateStr = el.dataset.date, id = el.dataset.id, field = el.dataset.field;
-      var day = getEffectiveDay(dateStr);
-      day.vehicles = day.vehicles.map(function(v){
-        if(v.id!==id) return v;
-        var nv = Object.assign({}, v);
-        nv[field] = el.value;
-        return nv;
-      });
-      applyDayChange(dateStr, day, debounced);
+      // Deliberately not saved/rendered here — see the comment above
+      // vehicleRowHtml(). The one exception is the "who" dropdown, which
+      // needs the "是誰" text box to appear/disappear as soon as "其他" is
+      // picked; that's a pure DOM tweak with no data write, so it's safe to
+      // do immediately without touching state or re-rendering the page.
+      if(el.dataset.field==="who") toggleVehicleCustomLabel(el);
+    } else if(action==="shopping-field"){
+      // Same deliberate no-op as vehicle-field above — a shopping row's
+      // fields (including the native date picker for "due") are only read
+      // once, at confirm time; see shopping-confirm/shopping-draft-confirm.
     } else if(action==="chore-field"){
       var dateStr = el.dataset.date, id = el.dataset.id, field = el.dataset.field;
       var day = getEffectiveDay(dateStr);
